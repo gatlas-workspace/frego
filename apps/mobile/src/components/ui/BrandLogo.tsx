@@ -19,7 +19,8 @@ const PROVIDER_IMG: Record<ProviderId, ImageSourcePropType> = {
   gsm: require('./logos/gsm.png'),
 };
 
-const CATEGORY: Record<CategoryTileKey, { icon: 'cup' | 'book' | 'gym' | 'cake' | 'bowl' | 'lotus'; bg: string }> = {
+/** Icon + màu nền ô ngành (dùng lại cho ghim quán trên bản đồ web). */
+export const CATEGORY: Record<CategoryTileKey, { icon: 'cup' | 'book' | 'gym' | 'cake' | 'bowl' | 'lotus'; bg: string }> = {
   cafe: { icon: 'cup', bg: colors.catCafe },
   cup: { icon: 'cup', bg: colors.catCafe },
   book: { icon: 'book', bg: colors.catBook },

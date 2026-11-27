@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import type { BizMemberView } from '@frego/core';
 import { Avatar, Button, Input, List, ListRow, Panel, Segmented, Status } from '@/components/web';
 import type { FormState } from '@/app/doanh-nghiep/_lib/form-state';
 import { useFormSubmit } from '@/app/doanh-nghiep/_lib/use-form-submit';
-import { inviteMemberAction } from '../actions';
+import { inviteMemberAction, removeMemberAction } from '../actions';
 
 /** Khung Thành viên: danh sách + "Mời" mở form email, vai trò (WebDnHoSo). */
 export function MembersPanel({ members, canManage }: { members: BizMemberView[]; canManage: boolean }) {
@@ -17,6 +17,16 @@ export function MembersPanel({ members, canManage }: { members: BizMemberView[];
     return next;
   });
   const emailError = state.status === 'error' ? state.fieldErrors?.email ?? state.message : undefined;
+  // Xóa thành viên: bấm "Xóa" → hỏi lại ngay trên dòng → xóa.
+  const [asking, setAsking] = useState<string | null>(null);
+  const [removeMsg, setRemoveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [removing, startRemove] = useTransition();
+  const remove = (id: string) =>
+    startRemove(async () => {
+      const r = await removeMemberAction(id);
+      setRemoveMsg({ ok: r.status === 'ok', text: r.message ?? '' });
+      setAsking(null);
+    });
   return (
     <Panel
       title="Thành viên"
@@ -39,7 +49,27 @@ export function MembersPanel({ members, canManage }: { members: BizMemberView[];
             leading={<Avatar initials={m.initials} />}
             title={m.email}
             sub={<span className="text-[12px]">{m.permissions}</span>}
-            trailing={<Status text={m.roleLabel} tone="grey" shape="tag" />}
+            trailing={
+              <span className="flex flex-wrap items-center justify-end gap-1.5">
+                <Status text={m.roleLabel} tone="grey" shape="tag" />
+                {canManage && !m.isMe ? (
+                  asking === m.id ? (
+                    <>
+                      <Button variant="danger" size="sm" disabled={removing} onClick={() => remove(m.id)}>
+                        Xóa {m.email}?
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled={removing} onClick={() => setAsking(null)}>
+                        Không
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="ghost" size="sm" aria-label={`Xóa thành viên ${m.email}`} onClick={() => setAsking(m.id)}>
+                      Xóa
+                    </Button>
+                  )
+                ) : null}
+              </span>
+            }
           />
         ))}
       </List>
@@ -74,6 +104,11 @@ export function MembersPanel({ members, canManage }: { members: BizMemberView[];
             </Button>
           </div>
         </form>
+      ) : null}
+      {removeMsg ? (
+        <p role={removeMsg.ok ? 'status' : 'alert'} className={`m-0 text-[13px] ${removeMsg.ok ? 'text-good-ink' : 'text-danger'}`}>
+          {removeMsg.text}
+        </p>
       ) : null}
       {state.status === 'ok' && !open ? (
         <p role="status" className="m-0 text-[13px] text-good-ink">

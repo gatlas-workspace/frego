@@ -9,6 +9,7 @@
  */
 import { brand } from '../brand';
 import { PROVIDERS, serviceShortLabel } from '../catalog';
+import { BIZ_EV_ADDRESS_REREVIEW } from './business';
 import type { StatRow } from '../db/schema';
 import type { Db } from '../db/types';
 import {
@@ -29,6 +30,7 @@ import {
   vnParts,
 } from '../format';
 import type {
+  AdBanner,
   AdminRole,
   AuditLog,
   Business,
@@ -133,8 +135,8 @@ export interface AdminOverviewView {
 
 /* QT 2 · Duyệt */
 
-export type ReviewTab = 'chien-dich' | 'doanh-nghiep';
-export type ReviewKind = 'campaign' | 'business';
+export type ReviewTab = 'chien-dich' | 'doanh-nghiep' | 'banner';
+export type ReviewKind = 'campaign' | 'business' | 'banner';
 export interface ReviewDecision {
   state: 'approved' | 'rejected';
   chip: AdminChip;
@@ -173,6 +175,19 @@ export interface ReviewDetail {
   /** Chỉ hồ sơ doanh nghiệp: giấy tờ đã gửi. */
   files: { icon: 'receipt' | 'camera'; text: string; ok: boolean }[];
   checks: AdminCheck[];
+  /** Câu hỏi lại trước khi bấm Duyệt (hồ sơ thiếu giấy phép / ảnh mặt tiền). null = duyệt luôn. */
+  approveConfirm?: string | null;
+  /** Chỉ banner quảng cáo: nội dung người dùng app sẽ thấy ở popup sau màn So giá (ảnh: URL xem được, có hạn nếu là ảnh riêng). */
+  banner?: {
+    imageUrl: string;
+    title: string;
+    body: string;
+    businessName: string;
+    category: CategoryKey;
+    address: string;
+    /** "Voucher −20.000đ Grab ô tô chuyến này là quà của …" theo chiến dịch đang chạy của quán ("" nếu chưa có) */
+    giftText: string;
+  } | null;
 }
 export interface ReviewPageView {
   tab: ReviewTab;
@@ -324,8 +339,9 @@ export interface BusinessesPageView {
 
 /* QT 6 · Chiến dịch */
 
-export type CampaignTab = 'tat-ca' | 'dang-chay' | 'cho-duyet' | 'tam-dung' | 'frego-dung';
-export type CampaignAdminState = 'running' | 'pending' | 'paused' | 'stopped' | 'ended' | 'rejected' | 'draft';
+export type CampaignTab = 'tat-ca' | 'dang-chay' | 'sap-chay' | 'cho-duyet' | 'tam-dung' | 'frego-dung';
+/** scheduled: đã duyệt nhưng chưa tới ngày bắt đầu ("Đã duyệt · chạy từ 01/12"), không tính là đang chạy. */
+export type CampaignAdminState = 'running' | 'scheduled' | 'pending' | 'paused' | 'stopped' | 'ended' | 'rejected' | 'draft';
 export interface CampaignRow {
   id: string;
   name: string;
@@ -463,15 +479,23 @@ function shortAddress(address: string): string {
   return parts.join(', ');
 }
 
-/** "Đường Võ Văn Tần, Quận 3, TP.HCM" → "Đường Võ Văn Tần, Quận 3" */
-function storeAddress(address: string): string {
-  return address.replace(/,\s*TP\.?\s?HCM$/i, '');
+/** Địa chỉ đầy đủ như doanh nghiệp khai, thêm ", TP.HCM" nếu thiếu tên thành phố. */
+function fullAddress(address: string): string {
+  const a = address.trim();
+  if (!a) return '';
+  return /(TP\.?\s?HCM|Hồ Chí Minh|Hà Nội)$/i.test(a) ? a : `${a}, TP.HCM`;
 }
 
-/** "Bán lẻ · Sách, văn phòng phẩm" → "Bán lẻ sách, văn phòng phẩm" */
+const DISTRICT_RE =
+  /(Quận\s+\d+|Bình Thạnh|Phú Nhuận|Thủ Đức|Gò Vấp|Tân Bình|Tân Phú|Bình Tân|Bình Chánh|Nhà Bè|Hóc Môn|Củ Chi|Cần Giờ)/;
+/** Quận theo địa chỉ hiện tại (cột district có thể cũ nếu doanh nghiệp vừa đổi địa chỉ). */
+function districtNow(b: Pick<Business, 'address' | 'district'>): string {
+  return DISTRICT_RE.exec(b.address)?.[1] ?? b.district;
+}
+
+/** Ngành giữ nguyên dấu "·" như doanh nghiệp khai ("Ăn uống · Cà phê"). */
 function industryText(industry: string): string {
-  const [a, b] = industry.split(' · ');
-  return b ? `${a} ${lowerFirst(b)}` : a;
+  return industry.trim();
 }
 /** "Ăn uống · Cà phê" → "Ăn uống" */
 const industryGroup = (industry: string) => industry.split(' · ')[0] || industry;
@@ -573,7 +597,7 @@ export function createAdminService(db: Db) {
   function campaignState(c: Campaign, evs: CampaignEvent[] | undefined): CampaignAdminState {
     switch (c.status) {
       case 'active':
-        return 'running';
+        return t(c.startsAt) > now().getTime() ? 'scheduled' : 'running';
       case 'paused':
         return stopReason(c, evs) !== null ? 'stopped' : 'paused';
       default:
@@ -588,6 +612,8 @@ export function createAdminService(db: Db) {
     switch (state) {
       case 'running':
         return lowBudget(c) ? { text: 'Sắp hết ngân sách', tone: 'amber' } : { text: 'Đang chạy', tone: 'green' };
+      case 'scheduled':
+        return { text: `Đã duyệt · chạy từ ${formatDayMonth(c.startsAt)}`, tone: 'blue' };
       case 'paused':
         return { text: 'Tạm dừng', tone: 'grey' };
       case 'stopped': {
@@ -618,7 +644,7 @@ export function createAdminService(db: Db) {
       const s = m.get(c.businessId);
       if (!s) continue;
       if (c.spent > 0) s.spentAny = true;
-      if (c.status === 'active') s.running += 1;
+      if (c.status === 'active' && t(c.startsAt) <= now().getTime()) s.running += 1;
       if (t(c.endsAt) < start || ['draft', 'pending', 'rejected'].includes(c.status)) continue;
       s.used += c.usedCount;
       s.spent += c.spent;
@@ -667,10 +693,25 @@ export function createAdminService(db: Db) {
     return null;
   }
 
+  const bannerDecision = (status: 'approved' | 'rejected', at: string): ReviewDecision =>
+    status === 'approved'
+      ? { state: 'approved', chip: { text: `Đã duyệt · ${formatRelative(at, now())}`, tone: 'green' } }
+      : { state: 'rejected', chip: { text: 'Đã từ chối · đã báo doanh nghiệp', tone: 'red' } };
+
   const queueChip = (d: ReviewDecision | null): AdminChip =>
     !d ? { text: 'Chờ duyệt', tone: 'amber' } : d.state === 'approved' ? { text: 'Đã duyệt', tone: 'green' } : { text: 'Đã từ chối', tone: 'red' };
 
-  async function campaignChecks(c: Campaign, b: Business): Promise<AdminCheck[]> {
+  /** Sự kiện "quay lại chờ duyệt vì đổi địa chỉ" của lần chờ duyệt hiện tại (sau lần Frego duyệt gần nhất). */
+  function addressRereview(c: Campaign, evs: CampaignEvent[] | undefined): CampaignEvent | null {
+    if (c.status !== 'pending' || !evs?.length) return null;
+    for (const e of evs) {
+      if (e.text.startsWith(BIZ_EV_ADDRESS_REREVIEW)) return e;
+      if (e.text.startsWith(EV_APPROVE) || e.text.startsWith(EV_REJECT)) return null;
+    }
+    return null;
+  }
+
+  async function campaignChecks(c: Campaign, b: Business, evs: CampaignEvent[] | undefined): Promise<AdminCheck[]> {
     const [st, fares, fregoCodes, publicCodes] = await Promise.all([
       db.list('stats', { where: { scope: `cp:${c.id}`, metric: 'review_check' } }),
       db.list('fare_tables', { where: { providerId: c.providerId, vehicleClass: c.vehicleClass } }),
@@ -680,13 +721,26 @@ export function createAdminService(db: Db) {
     const svc = offerServiceLabel(c.providerId, c.vehicleClass);
     const checks: AdminCheck[] = [];
     const noun = placeNoun(b.category);
+    const moved = addressRereview(c, evs);
     checks.push(
-      b.storefrontVerified
-        ? { tone: 'green', title: `Địa chỉ ${noun === 'quán' ? 'quán ' : ''}khớp vị trí trên bản đồ` }
-        : { tone: 'amber', title: 'Chưa xác nhận vị trí cửa hàng', text: 'Doanh nghiệp chưa gửi ảnh mặt tiền. Vùng áp dụng tính theo địa chỉ đã khai.' },
+      moved
+        ? {
+            tone: 'amber',
+            title: `${noun[0].toUpperCase()}${noun.slice(1)} vừa đổi địa chỉ, cần kiểm tra lại vị trí`,
+            text: `Chiến dịch quay lại chờ duyệt ngày ${formatDayMonth(moved.at)} vì doanh nghiệp đổi địa chỉ thành "${fullAddress(b.address)}". Ảnh mặt tiền đã xác nhận trước đó là của địa chỉ cũ.`,
+          }
+        : b.storefrontVerified
+          ? { tone: 'green', title: `Địa chỉ ${noun === 'quán' ? 'quán ' : ''}khớp vị trí trên bản đồ`, text: 'Đã xác nhận bằng ảnh mặt tiền.' }
+          : { tone: 'amber', title: 'Chưa xác nhận vị trí cửa hàng', text: 'Doanh nghiệp chưa gửi ảnh mặt tiền. Vùng áp dụng tính theo địa chỉ đã khai.' },
     );
     const img = new Map(st.map((r) => [r.key, r.value]));
-    if (img.has('image_width')) {
+    if (!img.has('image_width') && c.imageUrl) {
+      checks.push(
+        c.imageUrl === b.logoUrl
+          ? { tone: 'blue', title: 'Dùng logo của cửa hàng làm ảnh chiến dịch', text: 'Logo đã có trong Hồ sơ cửa hàng. Xem ảnh trước khi duyệt.' }
+          : { tone: 'amber', title: 'Ảnh chưa được kiểm tra tự động', text: 'Mở ảnh xem có số điện thoại, mã QR hay logo hãng xe không.' },
+      );
+    } else if (img.has('image_width')) {
       const w = img.get('image_width')!;
       const h = img.get('image_height') ?? w;
       const bad = [img.get('image_phone') ? 'số điện thoại' : null, img.get('image_qr') ? 'mã QR' : null].filter(Boolean);
@@ -756,6 +810,15 @@ export function createAdminService(db: Db) {
     const st = await db.list('stats', { where: { scope: `biz:${b.id}`, metric: 'review_check' } });
     const v = new Map(st.map((r) => [r.key, r.value]));
     const checks: AdminCheck[] = [];
+    const licenseUploaded = !!v.get('license_uploaded');
+    const missing = [licenseUploaded ? null : 'giấy phép kinh doanh', b.storefrontVerified ? null : 'ảnh mặt tiền'].filter(Boolean);
+    if (missing.length) {
+      checks.push({
+        tone: 'red',
+        title: `Hồ sơ thiếu ${missing.join(' và ')}`,
+        text: 'Chưa đủ căn cứ xác nhận cửa hàng có thật và đúng vị trí. Nên liên hệ doanh nghiệp bổ sung trước khi duyệt.',
+      });
+    }
     if (v.has('tax_active')) {
       checks.push(
         v.get('tax_active')
@@ -789,7 +852,7 @@ export function createAdminService(db: Db) {
         text: `Có thể là cửa hàng mới của doanh nghiệp này (${shortAddress(twin.address)}).`,
       });
     }
-    return { checks, licenseUploaded: !!v.get('license_uploaded') };
+    return { checks, licenseUploaded };
   }
 
   /* ───────────────────────── Truy vấn và lệnh ───────────────────────── */
@@ -885,17 +948,21 @@ export function createAdminService(db: Db) {
 
       /* Cần xử lý */
       const todo: OverviewTodo[] = [];
-      const pendC = campaigns.filter((c) => c.status === 'pending').length;
+      const bizIds = new Set(businesses.map((b) => b.id));
+      const pendC = campaigns.filter((c) => c.status === 'pending' && bizIds.has(c.businessId)).length;
       const pendB = businesses.filter((b) => b.status === 'pending').length;
+      const pendA = (await db.list('ad_banners', { where: { status: 'pending' } })).filter((a) => bizIds.has(a.businessId)).length;
       todo.push(
-        pendC + pendB > 0
+        pendC + pendB + pendA > 0
           ? {
               key: 'review',
               icon: 'shield',
               tone: 'warn',
-              title: `${pendC + pendB} mục chờ duyệt`,
-              sub: [pendC ? `${pendC} chiến dịch` : null, pendB ? `${pendB} doanh nghiệp mới` : null].filter(Boolean).join(', '),
-              href: pendC ? '/quan-tri/duyet' : '/quan-tri/duyet?tab=doanh-nghiep',
+              title: `${pendC + pendB + pendA} mục chờ duyệt`,
+              sub: [pendC ? `${pendC} chiến dịch` : null, pendB ? `${pendB} doanh nghiệp mới` : null, pendA ? `${pendA} banner quảng cáo` : null]
+                .filter(Boolean)
+                .join(', '),
+              href: pendC ? '/quan-tri/duyet' : pendB ? '/quan-tri/duyet?tab=doanh-nghiep' : '/quan-tri/duyet?tab=banner',
             }
           : { key: 'review', icon: 'shield', tone: 'good', title: 'Không có mục chờ duyệt', sub: 'Đã xử lý hết hồ sơ và chiến dịch', href: '/quan-tri/duyet' },
       );
@@ -1004,11 +1071,102 @@ export function createAdminService(db: Db) {
         .filter(({ b, d }) => b.status === 'pending' || (d && n.getTime() - t(b.joinedAt) <= NEW_BUSINESS_MS))
         .sort((a, b) => t(b.b.joinedAt) - t(a.b.joinedAt));
 
+      // Banner quảng cáo: chờ duyệt + đã quyết định gần đây (như chiến dịch).
+      const since = n.getTime() - RECENT_DECISION_MS;
+      const allBanners = await db.list('ad_banners');
+      const bannerItems = allBanners
+        .filter((a) => bizById.has(a.businessId))
+        .map((a) => ({
+          a,
+          d:
+            a.status === 'pending'
+              ? null
+              : a.reviewedAt && t(a.reviewedAt) >= since && (a.status === 'approved' || a.status === 'rejected')
+                ? bannerDecision(a.status, a.reviewedAt)
+                : undefined,
+        }))
+        .filter((x): x is { a: AdBanner; d: ReviewDecision | null } => x.d !== undefined)
+        .sort((x, y) => t(y.a.submittedAt) - t(x.a.submittedAt));
+
       const tabs: AdminTab<ReviewTab>[] = [
         { key: 'chien-dich', label: 'Chiến dịch', count: String(campItems.filter((x) => !x.d).length) },
         { key: 'doanh-nghiep', label: 'Doanh nghiệp mới', count: String(bizItems.filter((x) => !x.d).length) },
+        { key: 'banner', label: 'Banner quảng cáo', count: String(bannerItems.filter((x) => !x.d).length) },
       ];
-      const tab: ReviewTab = opts.tab === 'doanh-nghiep' ? 'doanh-nghiep' : 'chien-dich';
+      const tab: ReviewTab = opts.tab === 'doanh-nghiep' ? 'doanh-nghiep' : opts.tab === 'banner' ? 'banner' : 'chien-dich';
+
+      if (tab === 'banner') {
+        const items: ReviewQueueItem[] = bannerItems.map(({ a, d }) => {
+          const b = bizById.get(a.businessId)!;
+          return {
+            id: a.id,
+            kind: 'banner',
+            title: a.title,
+            subtitle: b.name,
+            category: b.category,
+            providerId: null,
+            meta: 'Banner popup sau màn So giá',
+            timeText: formatRelative(a.submittedAt, n),
+            chip: queueChip(d),
+          };
+        });
+        const pick = items.find((i) => i.id === opts.id) ?? items[0];
+        let selected: ReviewDetail | null = null;
+        if (pick) {
+          const { a, d } = bannerItems.find((x) => x.a.id === pick.id)!;
+          const b = bizById.get(a.businessId)!;
+          // Xét mọi banner (không chỉ bản quyết định gần đây): banner đã chạy từ lâu vẫn là "đang chạy".
+          const running = allBanners.some((x) => x.businessId === b.id && x.status === 'approved' && x.id !== a.id);
+          const camp =
+            campaigns.find((c) => c.businessId === b.id && campaignState(c, undefined) === 'running') ??
+            campaigns.find((c) => c.businessId === b.id && c.status === 'active');
+          // Dòng trạng thái theo tình trạng của chính banner này (chờ / đã duyệt / bị từ chối).
+          const stateCheck: AdminCheck =
+            a.status === 'pending'
+              ? {
+                  tone: 'blue',
+                  title: running ? 'Quán đang có banner chạy' : 'Quán chưa có banner chạy',
+                  text: running ? 'Duyệt bản này thì bản đang chạy được thay.' : 'Duyệt xong là hiện ngay trong app.',
+                }
+              : a.status === 'approved'
+                ? { tone: 'green', title: 'Đang hiện trong app' }
+                : { tone: 'red', title: 'Đã từ chối', text: a.rejectReason ?? undefined };
+          selected = {
+            kind: 'banner',
+            id: a.id,
+            title: `${b.name} · Banner quảng cáo`,
+            sub: `Gửi ${formatRelative(a.submittedAt, n)}`,
+            category: b.category,
+            decision: d,
+            preview: null,
+            facts: [
+              { label: 'Tiêu đề', value: a.title },
+              { label: 'Nội dung', value: a.body || 'Không có' },
+              { label: 'Hiện ở', value: 'Popup sau khi người dùng chọn hãng có mã của quán (màn So giá)' },
+              ...(a.status === 'rejected' && a.rejectReason ? [{ label: 'Lý do từ chối', value: a.rejectReason }] : []),
+            ],
+            files: [],
+            checks: [
+              { tone: a.title.length <= 40 ? 'green' : 'red', title: `Tiêu đề ${a.title.length}/40 ký tự` },
+              { tone: a.body.length <= 120 ? 'green' : 'red', title: `Nội dung ${a.body.length}/120 ký tự` },
+              stateCheck,
+              { tone: 'amber', title: 'Kiểm tra ảnh', text: 'Không có số điện thoại, mã QR, nội dung sai sự thật hoặc dùng logo hãng xe.' },
+            ],
+            banner: {
+              imageUrl: await db.files.viewUrl(a.imageUrl),
+              title: a.title,
+              body: a.body,
+              businessName: b.name,
+              category: b.category,
+              address: b.address,
+              giftText: camp
+                ? `Voucher ${formatDiscount(camp.amount)} ${serviceShortLabel(camp.providerId, camp.vehicleClass)} chuyến này là quà của ${b.name}.`
+                : '',
+            },
+          };
+        }
+        return { tab, tabs, items, selected, emptyText: 'Không còn banner nào chờ duyệt.' };
+      }
 
       const items: ReviewQueueItem[] =
         tab === 'chien-dich'
@@ -1044,7 +1202,7 @@ export function createAdminService(db: Db) {
         const { c, d } = campItems.find((x) => x.c.id === pick.id)!;
         const b = bizById.get(c.businessId)!;
         const noun = placeNoun(b.category);
-        const img = await db.list('stats', { where: { scope: `cp:${c.id}`, metric: 'review_check' } });
+        const moved = addressRereview(c, evs.get(c.id));
         selected = {
           kind: 'campaign',
           id: c.id,
@@ -1058,9 +1216,17 @@ export function createAdminService(db: Db) {
             amountText: formatDiscount(c.amount),
             serviceText: serviceShortLabel(c.providerId, c.vehicleClass),
             line: `Tặng riêng cho bạn. Điểm đến trong vùng ${formatMeters(c.radiusM)} quanh ${noun}.`,
-            meta: c.imageUrl || img.length ? 'Ảnh do doanh nghiệp tải lên' : 'Chưa có ảnh, app dùng logo theo ngành',
+            meta: !c.imageUrl
+              ? 'Chưa có ảnh, app dùng logo theo ngành'
+              : c.imageUrl === b.logoUrl
+                ? 'Logo của cửa hàng'
+                : 'Ảnh do doanh nghiệp tải lên',
           },
           facts: [
+            ...(moved
+              ? [{ label: 'Lý do chờ duyệt', value: `Quay lại chờ duyệt ngày ${formatDayMonth(moved.at)} vì quán đổi địa chỉ` }]
+              : []),
+            { label: 'Địa chỉ cửa hàng', value: fullAddress(b.address) || 'Chưa khai' },
             { label: 'Hãng và loại xe', value: offerServiceLabel(c.providerId, c.vehicleClass) },
             { label: 'Mức giảm', value: `${formatVnd(c.amount)} mỗi chuyến` },
             { label: 'Vùng áp dụng', value: `${formatMeters(c.radiusM)} quanh ${noun}` },
@@ -1070,7 +1236,7 @@ export function createAdminService(db: Db) {
             { label: 'Ví hiện có', value: formatVnd(b.walletBalance) },
           ],
           files: [],
-          checks: await campaignChecks(c, b),
+          checks: await campaignChecks(c, b, evs.get(c.id)),
         };
       } else if (pick) {
         const { b, d } = bizItems.find((x) => x.b.id === pick.id)!;
@@ -1087,14 +1253,22 @@ export function createAdminService(db: Db) {
             { label: 'Tên trên giấy phép', value: b.legalName || b.name },
             { label: 'Mã số thuế', value: b.taxCode ? maskTax(b.taxCode) : 'Chưa khai' },
             { label: 'Người đại diện', value: b.representative || 'Chưa khai' },
-            { label: 'Địa chỉ cửa hàng', value: storeAddress(b.address) || 'Chưa khai' },
+            { label: 'Địa chỉ cửa hàng', value: fullAddress(b.address) || 'Chưa khai' },
             { label: 'Ngành', value: industryText(b.industry) || 'Chưa khai' },
+            { label: 'Email liên hệ', value: b.contactEmail || 'Chưa khai' },
+            { label: 'Số điện thoại', value: b.contactPhone || 'Chưa khai' },
           ],
           files: [
             { icon: 'receipt', text: licenseUploaded ? 'Giấy phép kinh doanh.pdf' : 'Chưa có giấy phép', ok: licenseUploaded },
             { icon: 'camera', text: b.storefrontVerified ? 'Ảnh mặt tiền' : 'Chưa có ảnh mặt tiền', ok: b.storefrontVerified },
           ],
           checks,
+          approveConfirm:
+            !licenseUploaded || !b.storefrontVerified
+              ? `Hồ sơ ${b.name} còn thiếu ${[!licenseUploaded ? 'giấy phép kinh doanh' : null, !b.storefrontVerified ? 'ảnh mặt tiền' : null]
+                  .filter(Boolean)
+                  .join(' và ')}. Vẫn duyệt và cho doanh nghiệp tạo chiến dịch?`
+              : null,
         };
       }
       return {
@@ -1132,11 +1306,45 @@ export function createAdminService(db: Db) {
       await log(`Từ chối chiến dịch ${c.name}, ${b?.name ?? ''}: ${lowerFirst(why)}`);
     },
 
-    async approveBusiness(id: string): Promise<void> {
+    /** Duyệt banner: chép ảnh sang vùng công khai, banner đang chạy của quán (nếu có) chuyển thành "replaced". */
+    async approveBanner(id: string): Promise<void> {
+      const a = await db.get('ad_banners', id);
+      if (!a) throw new Error('Không tìm thấy banner');
+      if (a.status !== 'pending') throw new Error('Banner không còn chờ duyệt');
+      const b = await db.get('businesses', a.businessId);
+      const { name } = await actor();
+      const imageUrl = await db.files.publish(a.imageUrl);
+      const old = await db.list('ad_banners', { where: { businessId: a.businessId, status: 'approved' } });
+      for (const o of old) await db.update('ad_banners', o.id, { status: 'replaced' });
+      await db.update('ad_banners', id, { status: 'approved', imageUrl, rejectReason: null, reviewedAt: nowIso(), reviewedBy: name });
+      await log(`Duyệt banner quảng cáo "${a.title}", ${b?.name ?? ''}`.replace(/, $/, ''));
+    },
+
+    async rejectBanner(id: string, reason: string): Promise<void> {
+      const why = trimDot(reason);
+      if (!why) throw new Error('Cần lý do từ chối');
+      const a = await db.get('ad_banners', id);
+      if (!a) throw new Error('Không tìm thấy banner');
+      if (a.status !== 'pending') throw new Error('Banner không còn chờ duyệt');
+      const b = await db.get('businesses', a.businessId);
+      const { name } = await actor();
+      await db.update('ad_banners', id, { status: 'rejected', rejectReason: `${lowerFirst(why)}.`, reviewedAt: nowIso(), reviewedBy: name });
+      await log(`Từ chối banner quảng cáo "${a.title}", ${b?.name ?? ''}: ${lowerFirst(why)}`);
+    },
+
+    /** Duyệt hồ sơ. Thiếu giấy phép / ảnh mặt tiền thì phải xác nhận lại (`confirmMissing`), tránh duyệt nhầm. */
+    async approveBusiness(id: string, opts: { confirmMissing?: boolean } = {}): Promise<void> {
       const b = await db.get('businesses', id);
       if (!b) throw new Error('Không tìm thấy doanh nghiệp');
       if (b.status !== 'pending') throw new Error('Hồ sơ không còn chờ duyệt');
+      const st = await db.list('stats', { where: { scope: `biz:${b.id}`, metric: 'review_check' } });
+      const license = st.some((r) => r.key === 'license_uploaded' && r.value);
+      const missing = [license ? null : 'giấy phép kinh doanh', b.storefrontVerified ? null : 'ảnh mặt tiền'].filter(Boolean);
+      if (missing.length && !opts.confirmMissing) {
+        throw new Error(`Hồ sơ còn thiếu ${missing.join(' và ')}. Xác nhận lại nếu vẫn muốn duyệt.`);
+      }
       await db.rpc('review_business', { businessId: id, approve: true });
+      if (missing.length) await log(`Duyệt ${b.name} khi hồ sơ còn thiếu ${missing.join(' và ')}`);
     },
 
     async rejectBusiness(id: string, reason: string): Promise<void> {
@@ -1513,6 +1721,7 @@ export function createAdminService(db: Db) {
         const count = (s: CampaignAdminState) => states.filter((x) => x === s).length;
         return [
           count('running') ? `${count('running')} chạy` : null,
+          count('scheduled') ? `${count('scheduled')} sắp chạy` : null,
           count('pending') ? `${count('pending')} chờ duyệt` : null,
           count('paused') ? `${count('paused')} tạm dừng` : null,
           count('stopped') ? `${count('stopped')} đã dừng` : null,
@@ -1524,7 +1733,7 @@ export function createAdminService(db: Db) {
         return {
           id: b.id,
           name: b.name,
-          sub: `${b.district} · ${industryGroup(b.industry)}`,
+          sub: `${districtNow(b)} · ${industryGroup(b.industry)}`,
           campaignsText: main ?? 'chưa có',
           campaignsSub: rest.join(' · '),
           campaignsMuted: !main,
@@ -1541,7 +1750,7 @@ export function createAdminService(db: Db) {
         const legal = /^hộ kinh doanh/i.test(pick.legalName) ? 'hộ kinh doanh' : /^công ty/i.test(pick.legalName) ? 'công ty' : '';
         const h = pick.openHours;
         const hours = h.weekdays === h.saturday && h.weekdays === h.sunday ? h.weekdays : `${h.weekdays} (T2–T6), ${h.saturday} (T7), ${h.sunday} (CN)`;
-        const order: CampaignAdminState[] = ['running', 'pending', 'paused', 'stopped'];
+        const order: CampaignAdminState[] = ['running', 'scheduled', 'pending', 'paused', 'stopped'];
         const lockLog = pick.status === 'locked' ? logs.find((l) => l.action.startsWith(`Tạm khóa ${pick.name}`)) : undefined;
         const lockReason = lockLog?.action.split(', lý do ')[1];
         selected = {
@@ -1551,7 +1760,8 @@ export function createAdminService(db: Db) {
           chip: businessChip(pick.status),
           status: pick.status,
           facts: [
-            { label: 'Địa chỉ', value: shortAddress(pick.address) || 'Chưa khai' },
+            { label: 'Địa chỉ', value: fullAddress(pick.address) || 'Chưa khai' },
+            { label: 'Liên hệ', value: [pick.contactEmail, pick.contactPhone].filter(Boolean).join(' · ') || 'Chưa khai' },
             { label: 'Giờ mở cửa', value: hours },
             { label: 'Số dư ví', value: formatVnd(pick.walletBalance) },
             { label: `Đã chi tháng ${vnParts(n).month}`, value: formatVnd(s.spent) },
@@ -1621,7 +1831,8 @@ export function createAdminService(db: Db) {
       const evs = eventsByCampaign(events);
       const stateOf = (c: Campaign) => campaignState(c, evs.get(c.id));
 
-      const running = campaigns.filter((c) => c.status === 'active');
+      const running = campaigns.filter((c) => stateOf(c) === 'running');
+      const scheduled = campaigns.filter((c) => stateOf(c) === 'scheduled');
       const kpi = st.get('kpi', period);
       const src = st.get('codes_used_by_source', period);
       const srcPrev = st.get('codes_used_by_source', prevPeriod(period));
@@ -1633,7 +1844,9 @@ export function createAdminService(db: Db) {
           key: 'running',
           label: 'Đang chạy',
           value: formatNumber(running.length),
-          sub: `của ${formatNumber(new Set(running.map((c) => c.businessId)).size)} doanh nghiệp`,
+          sub:
+            `của ${formatNumber(new Set(running.map((c) => c.businessId)).size)} doanh nghiệp` +
+            (scheduled.length ? `, ${formatNumber(scheduled.length)} đã duyệt chờ ngày chạy` : ''),
           delta: null,
           deltaTone: 'neutral',
         },
@@ -1659,6 +1872,7 @@ export function createAdminService(db: Db) {
       const filter: Record<CampaignTab, (c: Campaign) => boolean> = {
         'tat-ca': () => true,
         'dang-chay': (c) => stateOf(c) === 'running',
+        'sap-chay': (c) => stateOf(c) === 'scheduled',
         'cho-duyet': (c) => stateOf(c) === 'pending',
         'tam-dung': (c) => stateOf(c) === 'paused',
         'frego-dung': (c) => stateOf(c) === 'stopped',
@@ -1666,6 +1880,7 @@ export function createAdminService(db: Db) {
       const label: Record<CampaignTab, string> = {
         'tat-ca': 'Tất cả',
         'dang-chay': 'Đang chạy',
+        'sap-chay': 'Sắp chạy',
         'cho-duyet': 'Chờ duyệt',
         'tam-dung': 'Tạm dừng',
         'frego-dung': 'Frego dừng',
@@ -1677,7 +1892,7 @@ export function createAdminService(db: Db) {
         count: formatNumber(campaigns.filter(filter[k]).length),
         ...(k === 'tat-ca' ? { icon: 'table' as const } : {}),
       }));
-      const rank: Record<CampaignAdminState, number> = { running: 0, paused: 1, stopped: 2, pending: 3, ended: 4, rejected: 5, draft: 6 };
+      const rank: Record<CampaignAdminState, number> = { running: 0, scheduled: 1, paused: 2, stopped: 3, pending: 4, ended: 5, rejected: 6, draft: 7 };
       const inTab = campaigns
         .filter((c) => bizById.has(c.businessId) && filter[tab](c))
         .sort((a, b) => rank[stateOf(a)] - rank[stateOf(b)] || b.usedCount - a.usedCount || a.name.localeCompare(b.name, 'vi'));
@@ -1694,8 +1909,13 @@ export function createAdminService(db: Db) {
           offerText: `${offerServiceLabel(c.providerId, c.vehicleClass)} · ${formatDiscount(c.amount)}`,
           radiusText: formatMeters(c.radiusM),
           codesText: s === 'pending' || s === 'draft' ? '—' : `${formatNumber(c.usedCount)} / ${formatNumber(c.issuedCount)}`,
-          budgetText: s === 'running' ? formatVnd(Math.max(0, c.budget - c.spent)) : s === 'pending' || s === 'draft' ? formatVnd(c.budget) : '—',
-          budgetMuted: !(s === 'running' || s === 'pending' || s === 'draft'),
+          budgetText:
+            s === 'running' || s === 'scheduled'
+              ? formatVnd(Math.max(0, c.budget - c.spent))
+              : s === 'pending' || s === 'draft'
+                ? formatVnd(c.budget)
+                : '—',
+          budgetMuted: !(s === 'running' || s === 'scheduled' || s === 'pending' || s === 'draft'),
           chip: campaignChip(c, evs.get(c.id)),
         };
       });
@@ -1724,7 +1944,7 @@ export function createAdminService(db: Db) {
           chip: campaignChip(c, list),
           state: s,
           facts: [
-            { label: 'Doanh nghiệp', value: `${b.name} · ${shortAddress(b.address)}` },
+            { label: 'Doanh nghiệp', value: `${b.name} · ${fullAddress(b.address)}` },
             { label: 'Ưu đãi', value: `${offerServiceLabel(c.providerId, c.vehicleClass)} · ${formatDiscount(c.amount)}` },
             { label: 'Vùng áp dụng', value: `${formatMeters(c.radiusM)} quanh ${placeNoun(b.category)}` },
             { label: 'Thời gian', value: dateRange(c.startsAt, c.endsAt) },
@@ -1734,7 +1954,7 @@ export function createAdminService(db: Db) {
             { label: 'Ví doanh nghiệp', value: formatVnd(b.walletBalance) },
           ],
           events: list.slice(0, 6).map((e) => ({ key: e.id, time: formatDayMonth(e.at), text: e.text })),
-          canPause: s === 'running',
+          canPause: s === 'running' || s === 'scheduled',
           canResume,
           note:
             s === 'paused'

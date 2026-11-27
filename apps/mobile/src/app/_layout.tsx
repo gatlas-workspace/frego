@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PushHost } from '@/components/PushHost';
 import { ApiProvider } from '@/lib/api';
+import { PickupProvider } from '@/lib/pickup';
 import { PushProvider } from '@/lib/push';
 import { TripFlowProvider } from '@/lib/trip-flow';
 import { colors } from '@/theme/tokens';
@@ -36,14 +37,17 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ApiProvider>
         <TripFlowProvider>
+          <PickupProvider>
           <PushProvider>
             <StatusBar style="dark" />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+              <Stack.Screen name="chuyen/quang-cao" options={{ presentation: 'fullScreenModal' }} />
               <Stack.Screen name="chuyen/mo-app" options={{ presentation: 'fullScreenModal' }} />
               <Stack.Screen name="bao-gia/[tripId]" options={{ presentation: 'fullScreenModal' }} />
             </Stack>
             <PushHost />
           </PushProvider>
+          </PickupProvider>
         </TripFlowProvider>
       </ApiProvider>
     </SafeAreaProvider>

@@ -1,7 +1,7 @@
 // 0d · Thông tin của bạn (ThongTin-v2): ảnh, tên gọi, ngày sinh, sở thích, loại xe. Không bắt buộc, có Bỏ qua.
 import { useQuery } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,14 +26,17 @@ export default function ThongTinScreen() {
   const insets = useSafeAreaInsets();
   const { status, svc } = useApi();
   const me = useQuery({ queryKey: ['me'], queryFn: () => svc.getMe(), enabled: status === 'signedIn' });
-  const next = () => router.push('/quyen-rieng-tu');
+  // Mở từ Tài khoản (?tu=tai-khoan): sửa hồ sơ rồi quay lại; mở trong luồng đăng ký: sang màn Quyền dữ liệu.
+  const { tu } = useLocalSearchParams<{ tu?: string }>();
+  const fromAccount = tu === 'tai-khoan';
+  const next = () => (fromAccount ? (router.canGoBack() ? router.back() : router.replace('/tai-khoan')) : router.push('/quyen-rieng-tu'));
 
   if (status === 'signedOut') return <Redirect href="/chao-mung" />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
       {me.data ? (
-        <ProfileForm me={me.data} topPad={Math.max(insets.top + 12, layout.topInset)} onDone={next} />
+        <ProfileForm me={me.data} topPad={Math.max(insets.top + 12, layout.topInset)} onDone={next} fromAccount={fromAccount} />
       ) : (
         <>
           <View style={{ flex: 1, paddingTop: Math.max(insets.top + 12, layout.topInset), paddingHorizontal: 24 }}>
@@ -49,7 +52,7 @@ export default function ThongTinScreen() {
   );
 }
 
-function ProfileForm({ me, topPad, onDone }: { me: MeView; topPad: number; onDone: () => void }) {
+function ProfileForm({ me, topPad, onDone, fromAccount }: { me: MeView; topPad: number; onDone: () => void; fromAccount: boolean }) {
   const { svc } = useApi();
   const p = me.profile;
   const [avatar, setAvatar] = useState<string | null>(p.avatarUrl);
@@ -101,8 +104,16 @@ function ProfileForm({ me, topPad, onDone }: { me: MeView; topPad: number; onDon
     let birthIso: string | null = null;
     if (birthday.trim()) {
       const d = parseDateVn(birthday);
-      if (!d || d.getTime() > Date.now()) {
-        setBirthdayError('Ngày sinh chưa đúng. Nhập theo dạng dd/mm/yyyy, ví dụ 20/05/1998.');
+      if (!d) {
+        setBirthdayError(
+          /^\d{2}\/\d{2}\/\d{4}$/.test(birthday.trim())
+            ? 'Ngày này không có trên lịch (VD 31/02). Kiểm tra lại ngày sinh.'
+            : 'Ngày sinh chưa đúng. Nhập theo dạng dd/mm/yyyy, ví dụ 20/05/1998.',
+        );
+        return;
+      }
+      if (d.getTime() > Date.now()) {
+        setBirthdayError('Ngày sinh không thể sau hôm nay.');
         return;
       }
       // Cột `date` (Supabase): lưu đúng ngày theo lịch Việt Nam, dạng yyyy-mm-dd.
@@ -187,8 +198,8 @@ function ProfileForm({ me, topPad, onDone }: { me: MeView; topPad: number; onDon
         {saveError ? <InlineError text={saveError} /> : null}
       </ScrollView>
       <BottomBar gap={4}>
-        <Button label={saving ? 'Đang lưu…' : 'Lưu và tiếp tục'} onPress={save} disabled={saving || picking} />
-        <Button label="Bỏ qua, điền sau" variant="text" size="sm" onPress={onDone} disabled={saving} />
+        <Button label={saving ? 'Đang lưu…' : fromAccount ? 'Lưu' : 'Lưu và tiếp tục'} onPress={save} disabled={saving || picking} />
+        <Button label={fromAccount ? 'Hủy' : 'Bỏ qua, điền sau'} variant="text" size="sm" onPress={onDone} disabled={saving} />
       </BottomBar>
       <SheetModal visible={sheet} onClose={() => setSheet(false)} title="Ảnh đại diện">
         <ListCard tone="alt" divider="lead">

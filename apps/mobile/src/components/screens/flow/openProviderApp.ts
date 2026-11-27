@@ -20,6 +20,16 @@ export async function copyText(text: string): Promise<boolean> {
  */
 export async function openProviderApp(view: Pick<OpenAppView, 'deepLink' | 'storeUrl'>): Promise<void> {
   if (Platform.OS === 'web') {
+    // Trình duyệt trên điện thoại (cả trong Zalo/Facebook): thử mở app bằng deep link; ~1,5 giây sau trang vẫn hiện
+    // (máy chưa cài app hoặc trình duyệt chặn) thì mới mở trang tải app. Máy tính: mở thẳng trang tải.
+    const mobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (mobile && typeof document !== 'undefined') {
+      const started = Date.now();
+      window.location.href = view.deepLink;
+      await new Promise((r) => setTimeout(r, 1500));
+      if (!document.hidden && Date.now() - started < 3000) await Linking.openURL(view.storeUrl).catch(() => {});
+      return;
+    }
     await Linking.openURL(view.storeUrl).catch(() => {});
     return;
   }

@@ -11,3 +11,4 @@ export { VehicleTile, type VehicleTileProps } from "./VehicleTile";
 export { VehicleArt, type VehicleBrand, type VehicleKind } from "./VehicleArt";
 export { ProviderLogo, type ProviderLogoProps } from "./ProviderLogo";
 export { MerchantLogo, type MerchantLogoKind, type MerchantLogoProps } from "./MerchantLogo";
+export { AdPopup, type AdPopupProps } from "./AdPopup";

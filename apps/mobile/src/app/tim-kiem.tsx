@@ -1,6 +1,7 @@
 // Màn 1b · Chọn điểm đến (thiết kế TimKiem-v2.dc.html)
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useDeferredValue, useState } from 'react';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { stripDiacritics, type PlaceView } from '@frego/core';
 import {
@@ -36,12 +37,31 @@ function splitHighlight(name: string, query: string): { hl?: string; title: stri
   return { hl: name.slice(0, end), title: rest };
 }
 
+/** Giá trị trễ `ms` sau lần đổi cuối (ngừng gõ mới hỏi máy chủ địa chỉ). */
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+/** Mở màn Chọn trên bản đồ, có thể đặt sẵn tâm (VD con đường vừa tìm). */
+function openPicker(at?: { lat: number; lng: number }, label?: string) {
+  router.push(
+    at
+      ? { pathname: '/chon-tren-ban-do', params: { lat: String(at.lat), lng: String(at.lng), ...(label ? { q: label } : {}) } }
+      : '/chon-tren-ban-do',
+  );
+}
+
 export default function SearchScreen() {
   const { svc } = useApi();
   const [query, setQuery] = useState('');
-  const [mapNote, setMapNote] = useState(false);
-  const q = useDeferredValue(query.trim());
+  const q = useDebounced(query.trim(), 300);
   const { go, busyId, error } = useStartTrip();
+  const provider = svc.geocodingProvider();
 
   const origin = useQuery({ queryKey: ['originLabel'], queryFn: () => svc.currentOriginLabel() });
   const home = useQuery({ queryKey: ['home'], queryFn: () => svc.getHome() });
@@ -58,36 +78,33 @@ export default function SearchScreen() {
 
   const placeRow = (p: PlaceView, mode: 'recent' | 'result') => {
     const parts = mode === 'result' ? splitHighlight(p.name, q) : { title: p.name };
+    // Chỉ có tên đường (dữ liệu không có số nhà): mở bản đồ tại đường đó để ghim đúng nhà.
+    const street = p.pickOnMap;
     return (
       <ListRow
         key={p.id}
-        icon={mode === 'result' ? 'pin' : 'clock'}
+        icon={street ? 'map' : mode === 'result' ? 'pin' : 'clock'}
         hl={parts.hl}
         title={parts.title}
-        sub={p.address}
-        meta={mode === 'result' ? p.distanceText : undefined}
+        sub={street ? [p.address, 'Chạm để ghim đúng nhà trên bản đồ'].filter(Boolean).join(' · ') : p.address}
+        meta={mode === 'result' ? p.distanceText || undefined : undefined}
         chip={p.voucherChip || undefined}
-        onPress={() => go(p.id)}
+        onPress={() => (street ? openPicker(street, p.name) : go(p.id))}
         disabled={busyId === p.id}
       />
     );
   };
 
   const mapButton = (
-    <View style={{ gap: 8 }}>
-      <Button
-        label="Chọn trên bản đồ"
-        variant="text"
-        size="sm"
-        icon="map"
-        block={false}
-        onPress={() => setMapNote(true)}
-        style={{ alignSelf: 'flex-start' }}
-      />
-      {mapNote ? (
-        <InfoNote tone="neutral" icon="info" text="Chọn trên bản đồ chưa có trong bản này. Gõ tên điểm đến để tìm." live />
-      ) : null}
-    </View>
+    <Button
+      label="Chọn trên bản đồ"
+      variant="text"
+      size="sm"
+      icon="map"
+      block={false}
+      onPress={() => openPicker()}
+      style={{ alignSelf: 'flex-start' }}
+    />
   );
 
   return (
@@ -167,6 +184,11 @@ export default function SearchScreen() {
               <ListCard accessibilityLabel="Kết quả tìm kiếm">{results.data.map((p) => placeRow(p, 'result'))}</ListCard>
             )}
             {mapButton}
+            {provider && q.length >= 2 ? (
+              <T size={12} lineHeight={16} color={colors.muted}>
+                {provider === 'goong' ? 'Gợi ý địa chỉ: Goong' : 'Gợi ý địa chỉ: Photon · © OpenStreetMap'}
+              </T>
+            ) : null}
             {results.data && results.data.some((p) => p.voucherCount > 0) ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Chip text={results.data.find((p) => p.voucherCount > 0)!.voucherChip} size="sm" />

@@ -44,7 +44,10 @@ const SECTIONS: LegalSection[] = [
           items={[
             <>
               <b className="text-app-ink">Vị trí khi đang dùng app.</b> Chỉ dùng trong lúc bạn đang dùng app, để điền
-              điểm đón và tính quãng đường.
+              điểm đón và tính quãng đường. Để vẽ đường đi và tính quãng đường theo đường phố, tọa độ điểm đón và điểm
+              đến của chuyến được gửi tới máy chủ tìm đường; máy chủ này không nhận tên hay số điện thoại của bạn. Chữ bạn
+              gõ khi tìm điểm đến và điểm bạn ghim trên bản đồ được gửi tới dịch vụ tìm địa chỉ (Goong) để gợi ý địa chỉ,
+              cũng không kèm tên hay số điện thoại.
             </>,
             <>
               <b className="text-app-ink">Góp dữ liệu tìm kiếm ẩn danh</b> (mặc định tắt). Gộp theo khu vực và khung giờ

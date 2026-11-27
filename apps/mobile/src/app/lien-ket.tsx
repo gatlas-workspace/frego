@@ -1,15 +1,22 @@
 // 11 · Liên kết ví, thẻ, ứng dụng (LienKet-v2). Thẻ chỉ chọn ngân hàng + loại thẻ, không nhập số thẻ.
-// Chưa có thỏa thuận với đối tác thì Frego chỉ ghi nhận người dùng có dùng ví, app đó.
+// Ngân hàng, ví: Frego chỉ ghi nhận người dùng có dùng để gợi ý mã hợp.
+// Grab / Be / Green SM: "Đã cài app" — chỉ ghi nhận để ưu tiên mã; Frego không kết nối tài khoản hãng.
+// Gmail: tự lấy giá từ biên nhận email (lib/gmail.ts). Chưa bật ở máy chủ → "Sắp có"; DEMO → liên kết giả lập, ghi rõ.
 import { useQuery } from '@tanstack/react-query';
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import * as WebBrowser from 'expo-web-browser';
+import { useState, type ReactNode } from 'react';
 import { ScrollView, View } from 'react-native';
-import { brand, type LinkRowView, type ProviderId } from '@frego/core';
-import { Button, InfoNote, ListCard, ListRow, Pill, ScreenHeader, SectionTitle, T } from '@/components/ui';
+import { brand, type GmailSyncResult, type LinkRowView, type ProviderId } from '@frego/core';
+import { Button, Chip, InfoNote, ListCard, ListRow, Pill, ScreenHeader, SectionTitle, T } from '@/components/ui';
 import { ErrorView, InlineError, LoadingView } from '@/components/screens/account/ScreenState';
 import { SheetModal } from '@/components/screens/account/SheetModal';
 import { refreshAll, useApi } from '@/lib/api';
+import { useGmail } from '@/lib/gmail';
 import { colors } from '@/theme/tokens';
+
+// Bản web: cửa sổ đăng nhập Google quay về trang này → báo kết quả cho cửa sổ app rồi tự đóng (bản cài: không làm gì).
+WebBrowser.maybeCompleteAuthSession();
 
 type CardType = 'credit' | 'debit';
 const CARD_TYPES: { key: CardType; label: string }[] = [
@@ -40,8 +47,17 @@ export default function LienKetScreen() {
     }
   };
   const link = (r: LinkRowView, cardType: CardType | null = null) =>
-    run(r.partnerId, () => svc.link(r.partnerId, cardType), `Chưa liên kết được ${r.name}. Thử lại sau ít phút.`);
-  const unlink = (r: LinkRowView) => run(r.partnerId, () => svc.unlink(r.partnerId), `Chưa gỡ được liên kết ${r.name}. Thử lại sau ít phút.`);
+    run(
+      r.partnerId,
+      () => svc.link(r.partnerId, cardType),
+      r.isRideApp ? `Chưa lưu được ${r.name}. Thử lại sau ít phút.` : `Chưa liên kết được ${r.name}. Thử lại sau ít phút.`,
+    );
+  const unlink = (r: LinkRowView) =>
+    run(
+      r.partnerId,
+      () => svc.unlink(r.partnerId),
+      r.isRideApp ? `Chưa bỏ được ${r.name}. Thử lại sau ít phút.` : `Chưa gỡ được liên kết ${r.name}. Thử lại sau ít phút.`,
+    );
 
   const section = (id: string, title: string, rows: LinkRowView[]) => (
     <View style={{ gap: 10 }}>
@@ -57,9 +73,11 @@ export default function LienKetScreen() {
             sub={r.desc}
             subWrap
             trail={r.linked ? 'done' : 'action'}
+            actionLabel={r.isRideApp ? 'Có cài' : undefined}
+            doneLabel={r.isRideApp ? 'Đã cài app' : undefined}
             onAction={() => link(r)}
             onPress={r.linked ? () => setUnlinkRow(r) : undefined}
-            accessibilityHint={r.linked ? 'Bấm để gỡ liên kết' : undefined}
+            accessibilityHint={r.linked ? (r.isRideApp ? 'Bấm để bỏ đánh dấu đã cài app' : 'Bấm để gỡ liên kết') : undefined}
             disabled={busyId === r.partnerId}
           />
         ))}
@@ -68,6 +86,7 @@ export default function LienKetScreen() {
   );
 
   const d = links.data;
+  const ride = !!unlinkRow?.isRideApp;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="Liên kết ví, thẻ, ứng dụng" backLabel="Quay lại Tài khoản" />
@@ -93,7 +112,14 @@ export default function LienKetScreen() {
               </T>
             </View>
             {section('lk-vi', 'Ví điện tử', d.wallets)}
-            {section('lk-app', 'Ứng dụng khác', d.apps)}
+            <View style={{ gap: 10 }}>
+              {section('lk-app', 'App đặt xe bạn đã cài', d.apps)}
+              <T size={13} lineHeight={19} color={colors.muted}>
+                {brand.name} chỉ ghi nhận bạn có cài app để ưu tiên mã của hãng đó. {brand.name} không kết nối tài khoản Grab, Be,
+                Green SM nên không biết khi nào mã được dùng: giá thật lấy từ biên nhận Gmail hoặc do bạn báo.
+              </T>
+            </View>
+            <GmailSection />
             <T size={13} lineHeight={19} color={colors.muted}>
               {brand.name} chỉ lưu tên ngân hàng, loại thẻ và tên ví, không lưu số thẻ hay mật khẩu. Bạn gỡ liên kết được bất cứ lúc nào.
             </T>
@@ -118,19 +144,194 @@ export default function LienKetScreen() {
       <SheetModal
         visible={!!unlinkRow}
         onClose={() => setUnlinkRow(null)}
-        title={unlinkRow ? `Gỡ liên kết ${unlinkRow.name}?` : ''}
-        subtitle={`${brand.name} sẽ không gợi ý mã cần ${unlinkRow?.name ?? ''} nữa. Bạn liên kết lại được bất cứ lúc nào.`}
+        title={unlinkRow ? (ride ? `Bỏ đánh dấu ${unlinkRow.name}?` : `Gỡ liên kết ${unlinkRow.name}?`) : ''}
+        subtitle={
+          ride
+            ? `${brand.name} sẽ không ưu tiên mã ${unlinkRow?.name ?? ''} nữa. Bạn đánh dấu lại được bất cứ lúc nào.`
+            : `${brand.name} sẽ không gợi ý mã cần ${unlinkRow?.name ?? ''} nữa. Bạn liên kết lại được bất cứ lúc nào.`
+        }
         footer={
           <>
             <Button
-              label="Gỡ liên kết"
+              label={ride ? 'Bỏ đánh dấu' : 'Gỡ liên kết'}
               onPress={() => {
                 const r = unlinkRow;
                 setUnlinkRow(null);
                 if (r) unlink(r);
               }}
             />
-            <Button label="Giữ liên kết" variant="text" size="sm" onPress={() => setUnlinkRow(null)} />
+            <Button label={ride ? 'Giữ' : 'Giữ liên kết'} variant="text" size="sm" onPress={() => setUnlinkRow(null)} />
+          </>
+        }
+      />
+    </View>
+  );
+}
+
+/** Gmail: tự lấy giá từ biên nhận Grab, Be, Green SM. */
+function GmailSection() {
+  const g = useGmail();
+  const [busy, setBusy] = useState<'link' | 'sync' | 'unlink' | null>(null);
+  const [message, setMessage] = useState<{ tone: 'tint' | 'neutral'; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
+  const st = g.status;
+  const demo = g.availability === 'demo';
+
+  const syncText = (r: GmailSyncResult) => {
+    const parts =
+      r.matched > 0
+        ? [`Đã ghi giá ${r.matched} chuyến từ biên nhận${r.pointsAwarded > 0 ? `, +${r.pointsAwarded} điểm` : ''}.`]
+        : [r.checked > 0 ? 'Biên nhận mới chưa khớp chuyến nào bạn mở từ Frego.' : 'Chưa có biên nhận mới.'];
+    if (r.held) parts.push(r.held);
+    return parts.join(' ');
+  };
+
+  const doSync = async () => {
+    setBusy('sync');
+    setError(null);
+    try {
+      const r = await g.sync();
+      setMessage({ tone: r.matched > 0 ? 'tint' : 'neutral', text: syncText(r) });
+      await refreshAll();
+    } catch {
+      setError('Chưa đọc được biên nhận. Thử lại sau ít phút.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doLink = async () => {
+    setBusy('link');
+    setError(null);
+    setMessage(null);
+    try {
+      const outcome = await g.link();
+      await refreshAll();
+      if (outcome === 'linked') {
+        setBusy(null);
+        await doSync();
+        return;
+      }
+      if (outcome === 'failed') setError('Chưa liên kết được Gmail. Thử lại sau ít phút.');
+    } catch {
+      setError('Chưa liên kết được Gmail. Thử lại sau ít phút.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doUnlink = async () => {
+    setConfirmUnlink(false);
+    setBusy('unlink');
+    setError(null);
+    setMessage(null);
+    try {
+      await g.unlink();
+      await refreshAll();
+    } catch {
+      setError('Chưa gỡ được liên kết Gmail. Thử lại sau ít phút.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const loading = g.availabilityLoading || ((g.availability === 'demo' || g.availability === 'live') && !st && !g.statusError);
+  const soon = g.availability === 'soon' || g.statusError;
+
+  let body: ReactNode;
+  if (loading) {
+    body = <ListRow icon="mail" title="Gmail" sub="Đang kiểm tra…" />;
+  } else if (soon) {
+    body = (
+      <>
+        <ListRow icon="mail" leadTone="neutral" title="Gmail" sub="Tự lấy giá từ biên nhận Grab, Be, Green SM" subWrap chip="Sắp có" chipTone="tint" />
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+          <T size={13} lineHeight={19} color={colors.muted}>
+            {brand.name} đang chờ Google duyệt quyền đọc biên nhận. Trong lúc chờ, bạn nhập số tiền ở màn Báo giá để nhận điểm.
+          </T>
+          <Button label="Sắp có" variant="secondary" size="sm" disabled accessibilityHint="Tính năng chưa mở" />
+        </View>
+      </>
+    );
+  } else if (st?.linked) {
+    body = (
+      <>
+        <ListRow
+          icon="mail"
+          title="Gmail"
+          sub={demo ? `${st.email ?? ''} · liên kết giả lập` : (st.email ?? '')}
+          subWrap
+          trail="done"
+          doneLabel="Đã liên kết"
+        />
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+          {demo ? <Chip text="Bản thử DEMO · không có Google thật" tone="neutral" size="sm" style={{ alignSelf: 'flex-start' }} /> : null}
+          {st.error ? <InlineError text={st.error} /> : null}
+          <T size={13} lineHeight={19} color={colors.muted}>
+            {[st.matchedCount > 0 ? `Đã tự ghi giá ${st.matchedCount} chuyến.` : 'Chưa ghi giá chuyến nào.', st.lastSyncText]
+              .filter(Boolean)
+              .join(' ')}
+          </T>
+          <Button
+            label={busy === 'sync' ? 'Đang đọc biên nhận…' : 'Đọc biên nhận mới'}
+            variant="secondary"
+            size="sm"
+            icon="receipt"
+            disabled={!!busy}
+            onPress={doSync}
+          />
+          <Button label="Gỡ liên kết Gmail" variant="text" size="sm" disabled={!!busy} onPress={() => setConfirmUnlink(true)} />
+        </View>
+      </>
+    );
+  } else {
+    body = (
+      <>
+        <ListRow icon="mail" title="Gmail" sub="Mỗi chuyến có biên nhận Grab, Be, Green SM sẽ tự được ghi giá và cộng điểm." subWrap />
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+          {demo ? (
+            <T size={13} lineHeight={19} color={colors.muted}>
+              Chế độ DEMO: không kết nối Google thật. Liên kết và biên nhận ở đây đều là giả lập để xem thử luồng.
+            </T>
+          ) : null}
+          {g.needsLogin ? (
+            <T size={13} lineHeight={19} color={colors.muted}>
+              Đăng nhập bằng số điện thoại để liên kết Gmail.
+            </T>
+          ) : null}
+          <Button
+            label={busy === 'link' ? 'Đang mở Google…' : demo ? 'Liên kết thử (DEMO)' : 'Liên kết Gmail'}
+            size="sm"
+            icon={demo ? undefined : 'external'}
+            disabled={!!busy || g.needsLogin}
+            onPress={doLink}
+          />
+        </View>
+      </>
+    );
+  }
+
+  return (
+    <View style={{ gap: 10 }}>
+      <SectionTitle text="Tự lấy giá từ biên nhận email" size="sm" nativeID="lk-gmail" />
+      {error ? <InlineError text={error} /> : null}
+      {message ? <InfoNote tone={message.tone} icon="receipt" text={message.text} live /> : null}
+      <ListCard accessibilityLabel="Tự lấy giá từ biên nhận email">{body}</ListCard>
+      <T size={13} lineHeight={19} color={colors.muted}>
+        {brand.name} chỉ tìm thư biên nhận của Grab, Be, Green SM để lấy số tiền, giờ chuyến, điểm đón và điểm đến; không lưu nội
+        dung thư. Khi bạn gỡ liên kết, {brand.name} thu hồi quyền đọc ngay.
+      </T>
+
+      <SheetModal
+        visible={confirmUnlink}
+        onClose={() => setConfirmUnlink(false)}
+        title="Gỡ liên kết Gmail?"
+        subtitle={`${brand.name} sẽ ngừng đọc biên nhận. Giá các chuyến đã ghi vẫn giữ trong lịch sử của bạn.`}
+        footer={
+          <>
+            <Button label="Gỡ liên kết" onPress={doUnlink} />
+            <Button label="Giữ liên kết" variant="text" size="sm" onPress={() => setConfirmUnlink(false)} />
           </>
         }
       />

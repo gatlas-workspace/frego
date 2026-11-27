@@ -1,5 +1,5 @@
 /** Menu thanh bên (WebSidebar). key trùng với thuộc tính active trong thiết kế. */
-export type BizNavKey = 'tongquan' | 'chiendich' | 'baocao' | 'vi' | 'hoso';
+export type BizNavKey = 'tongquan' | 'chiendich' | 'quangcao' | 'baocao' | 'vi' | 'hoso';
 export type AdminNavKey =
   | 'tongquan'
   | 'duyet'
@@ -20,6 +20,7 @@ export const BIZ_NAV: { group: string; items: { key: BizNavKey; label: string; h
     items: [
       { key: 'tongquan', label: 'Tổng quan', href: '/doanh-nghiep', icon: 'home' },
       { key: 'chiendich', label: 'Chiến dịch', href: '/doanh-nghiep/chien-dich', icon: 'ticket' },
+      { key: 'quangcao', label: 'Quảng cáo', href: '/doanh-nghiep/quang-cao', icon: 'camera' },
       { key: 'baocao', label: 'Báo cáo', href: '/doanh-nghiep/bao-cao', icon: 'chart' },
       { key: 'vi', label: 'Ví và hóa đơn', href: '/doanh-nghiep/vi', icon: 'wallet' },
       { key: 'hoso', label: 'Hồ sơ cửa hàng', href: '/doanh-nghiep/ho-so', icon: 'brief' },

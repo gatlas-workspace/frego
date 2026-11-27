@@ -14,6 +14,9 @@ import {
   createMemoryDb,
   createSeed,
   createUserService,
+  createGoongGeocoder,
+  createPhotonGeocoder,
+  createValhallaRouter,
   DEMO_USER_ID,
   maskPhone,
   toE164Vn,
@@ -26,6 +29,27 @@ import { createSupabaseDb } from '@frego/core/supabase';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 export const MODE: 'demo' | 'supabase' = SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'demo';
+
+/**
+ * Máy chủ tìm đường Valhalla (docs/research/tim-duong.md). Mặc định khi thử nghiệm: máy chủ công cộng FOSSGIS
+ * (tối đa 1 lượt/giây, không dùng cho bản chính thức). Ra mắt: đặt EXPO_PUBLIC_ROUTING_URL tới máy chủ tự chạy.
+ * Đặt "off" để tắt (km/phút ước tính theo đường chim bay).
+ */
+const ROUTING_URL = process.env.EXPO_PUBLIC_ROUTING_URL || 'https://valhalla1.openstreetmap.de';
+const router = ROUTING_URL === 'off' ? null : createValhallaRouter({ baseUrl: ROUTING_URL });
+
+/**
+ * Tìm địa chỉ (chốt 27/11/2026: Goong). Có EXPO_PUBLIC_GOONG_API_KEY → Goong; chưa có → tạm Photon công cộng
+ * (EXPO_PUBLIC_GEOCODING_URL đổi được máy chủ Photon; "off" = tắt, chỉ tìm địa điểm có sẵn).
+ * Key Goong nằm trong app (ai cũng đọc được): giới hạn key và hạn mức trong trang quản lý Goong.
+ */
+const GOONG_KEY = process.env.EXPO_PUBLIC_GOONG_API_KEY;
+const GEOCODING_URL = process.env.EXPO_PUBLIC_GEOCODING_URL || 'https://photon.komoot.io';
+const geocoder = GOONG_KEY
+  ? createGoongGeocoder({ apiKey: GOONG_KEY })
+  : GEOCODING_URL === 'off'
+    ? null
+    : createPhotonGeocoder({ baseUrl: GEOCODING_URL });
 
 const DEMO_DATA_KEY = 'frego.demo.data.v1';
 const DEMO_SESSION_KEY = 'frego.demo.session.v1';
@@ -79,7 +103,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     return createSupabaseDb(client);
   }, []);
   const db: Db = supa ?? demoDb;
-  const svc = useMemo(() => createUserService(db), [db]);
+  const svc = useMemo(() => createUserService(db, { router, geocoder }), [db]);
 
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [guest, setGuest] = useState(false);

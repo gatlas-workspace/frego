@@ -10,6 +10,13 @@ export async function saveProfileAction(_prev: FormState, fd: FormData): Promise
   const v = formValues(fd);
   try {
     const { svc } = await bizService();
+    // Logo mới (ô chọn ảnh gửi kèm form với name="logo"); không chọn ảnh thì trình duyệt gửi tệp rỗng.
+    const logo = fd.get('logo');
+    let logoSaved = false;
+    if (logo && typeof logo === 'object' && 'arrayBuffer' in logo && logo.size > 0) {
+      await svc.updateLogo({ bytes: new Uint8Array(await logo.arrayBuffer()), contentType: logo.type, name: logo.name });
+      logoSaved = true;
+    }
     const { message } = await svc.updateProfile({
       name: v.name ?? '',
       industry: (v.industry ?? '').trim(),
@@ -19,7 +26,7 @@ export async function saveProfileAction(_prev: FormState, fd: FormData): Promise
       notifyPrefs: { review: v.notifyReview === 'on', lowBalance: v.notifyLowBalance === 'on', weekly: v.notifyWeekly === 'on' },
     });
     revalidatePath('/doanh-nghiep', 'layout');
-    return okState(message);
+    return okState(logoSaved ? `Đã đổi logo. ${message}` : message);
   } catch (e) {
     return failState(e);
   }
@@ -31,6 +38,18 @@ export async function inviteMemberAction(_prev: FormState, fd: FormData): Promis
   try {
     const { svc } = await bizService();
     const { message } = await svc.inviteMember(String(fd.get('email') ?? ''), role);
+    revalidatePath('/doanh-nghiep/ho-so');
+    return okState(message);
+  } catch (e) {
+    return failState(e);
+  }
+}
+
+/** Xóa thành viên (chủ cửa hàng; không tự xóa mình, không xóa chủ cuối cùng). */
+export async function removeMemberAction(memberId: string): Promise<FormState> {
+  try {
+    const { svc } = await bizService();
+    const { message } = await svc.removeMember(memberId);
     revalidatePath('/doanh-nghiep/ho-so');
     return okState(message);
   } catch (e) {

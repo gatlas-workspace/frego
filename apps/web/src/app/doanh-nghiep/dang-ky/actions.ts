@@ -1,6 +1,15 @@
 'use server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DEMO_OWNER_ID, parseBizRegistration, registerBusiness, type Db, type MemoryDb } from '@frego/core';
+import {
+  BizServiceError,
+  DEMO_OWNER_ID,
+  createBusinessService,
+  createPhotonGeocoder,
+  parseBizRegistration,
+  registerBusiness,
+  type Db,
+  type MemoryDb,
+} from '@frego/core';
 import { MODE, getDb } from '@/lib/server/data';
 import { failState } from '@/app/doanh-nghiep/_lib/fail';
 import { formValues, type FormState } from '@/app/doanh-nghiep/_lib/form-state';
@@ -46,6 +55,17 @@ export async function registerBusinessAction(_prev: FormState, fd: FormData): Pr
       (db as MemoryDb).setUser(DEMO_OWNER_ID);
     }
     const b = await registerBusiness(db, input);
+    // Gợi ý chỗ đặt ghim: tìm địa chỉ đã khai (Photon/OSM, tối đa 4 giây); không thấy thì giữa TP.HCM.
+    let pin = { lat: b.lat, lng: b.lng };
+    if (!draft) {
+      try {
+        const hits = await createPhotonGeocoder({ timeoutMs: 4000 }).search(input.address, pin);
+        const hit = hits.find((h) => typeof h.lat === 'number' && typeof h.lng === 'number');
+        if (hit) pin = { lat: hit.lat!, lng: hit.lng! };
+      } catch {
+        /* giữ tọa độ mặc định */
+      }
+    }
     const missing = [raw.hasLicense === '1' ? '' : 'giấy phép kinh doanh', raw.hasStorefront === '1' ? '' : 'ảnh mặt tiền'].filter(Boolean);
     return {
       status: 'ok',
@@ -56,9 +76,33 @@ export async function registerBusinessAction(_prev: FormState, fd: FormData): Pr
         !draft && missing.length
           ? `Hồ sơ còn thiếu ${missing.join(' và ')}. Bạn có thể bổ sung sau, Frego sẽ nhắc nếu cần để xác nhận vị trí.`
           : undefined,
+      data: draft ? undefined : { businessId: b.id, lat: pin.lat, lng: pin.lng, email: input.contactEmail },
       at: Date.now(),
     };
   } catch (e) {
     return failState(e, 'Chưa gửi được hồ sơ. Thử lại sau ít phút.');
+  }
+}
+
+/**
+ * Bước 2 sau khi gửi hồ sơ: lưu vị trí ghim trên bản đồ (cột lat, lng của cửa hàng; chủ cửa hàng mới được sửa).
+ * Vùng áp dụng của mã tính từ ghim này.
+ */
+export async function saveRegisteredPinAction(businessId: string, lat: number, lng: number): Promise<FormState> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return { status: 'error', message: 'Vị trí không hợp lệ.', at: Date.now() };
+  }
+  // Ghim phải nằm trong khu vực đang phục vụ (TP.HCM và lân cận).
+  if (lat < 10.3 || lat > 11.2 || lng < 106.3 || lng > 107.1) {
+    return { status: 'error', message: 'Ghim đang nằm ngoài TP.HCM. Kéo bản đồ về đúng cửa hàng.', at: Date.now() };
+  }
+  try {
+    const db = await getDb();
+    if (MODE === 'demo' && !db.currentUserId()) (db as MemoryDb).setUser(DEMO_OWNER_ID);
+    if (!db.currentUserId()) throw new BizServiceError('Đăng nhập lại để lưu vị trí.');
+    await createBusinessService(db, businessId).updateProfile({ lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) });
+    return { status: 'ok', message: 'Đã lưu vị trí cửa hàng.', at: Date.now() };
+  } catch (e) {
+    return failState(e, 'Chưa lưu được vị trí. Thử lại sau ít phút.');
   }
 }

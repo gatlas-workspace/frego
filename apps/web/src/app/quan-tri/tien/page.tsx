@@ -51,27 +51,18 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const tabParam = first(params.tab);
   const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'topup';
-  const chosenId = first(params.chon);
 
   const { svc } = await adminOpsService();
   const v = await svc.getMoney();
   const { walletHeld, deducted, serviceFee, pendingTopups } = v.stats;
 
-  // Giao dịch nút "Khớp" áp dụng: dòng chờ khớp đang chọn, không thì dòng chờ đầu tiên trong bảng.
-  const target = v.pendingTopups.find((p) => p.id === chosenId) ?? v.pendingTopups[0] ?? null;
-  const chosenIndex = chosenId ? v.topups.findIndex((t) => t.id === chosenId && t.status === 'pending') : -1;
-
   const topRows: TableRow[] = v.topups.map((t) => ({
     key: t.id,
     cells: [
       t.timeText,
-      {
-        text: t.businessName,
-        strong: true,
-        href: t.status === 'pending' ? `/quan-tri/tien?tab=topup&chon=${encodeURIComponent(t.id)}` : undefined,
-      },
-      // Nội dung chuyển khoản ("FREGO CPM1024") hiện như mã; nguồn khác ("Thẻ đã lưu") là chữ thường.
-      { text: t.reference, code: /^[A-Z0-9 ]+$/.test(t.reference) },
+      { text: t.businessName, strong: true },
+      // Nội dung chuyển khoản riêng mỗi lần nạp ("FREGO CPM1024-2") hiện như mã.
+      { text: t.reference, code: /^[A-Z0-9 -]+$/.test(t.reference) },
       { text: t.amountText, strong: true },
       { text: t.label.text, status: t.label.tone },
     ],
@@ -138,7 +129,6 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
         <section aria-label="Sổ tiền" className="flex min-w-0 flex-col">
           <Tabs
             label="Sổ tiền"
-            toolbar
             active={tab}
             pathname="/quan-tri/tien"
             items={[
@@ -150,11 +140,12 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
           />
           {tab === 'topup' ? (
             <>
-              <Table cols={topCols} rows={topRows} caption="Nạp tiền" flush highlight={chosenIndex >= 0 ? chosenIndex : undefined} emptyText="Chưa có lần nạp tiền nào." />
               <TopupMatch
-                target={target}
-                note="Khớp theo nội dung chuyển khoản. Doanh nghiệp được báo ngay khi tiền vào ví."
+                rows={v.pendingTopups}
+                note="Mỗi lần nạp có nội dung chuyển khoản riêng. Khớp từng dòng theo sao kê; nạp qua PayOS tự khớp, không cần bấm."
               />
+              <h3 className="m-0 mb-1 mt-5 text-[14px] font-semibold text-ink">Lịch sử nạp tiền</h3>
+              <Table cols={topCols} rows={topRows} caption="Nạp tiền" flush emptyText="Chưa có lần nạp tiền nào." />
             </>
           ) : null}
           {tab === 'deduct' ? (

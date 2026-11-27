@@ -240,7 +240,35 @@ export interface Campaign {
   submittedAt: ISODate | null;
   approvedAt: ISODate | null;
   createdAt: ISODate;
+  /** Số lượt hiện popup quảng cáo của quán sau khi người dùng chọn hãng có mã của chiến dịch này (RPC record_ad_view) */
+  adViewCount: number;
 }
+
+export type AdBannerStatus = 'pending' | 'approved' | 'rejected' | 'replaced';
+
+/**
+ * Banner quảng cáo của quán (popup sau màn So giá). Doanh nghiệp gửi, Frego duyệt (chốt 27/11/2026).
+ * Mỗi quán hiện banner đã duyệt mới nhất; gửi bản mới thì bản cũ chạy tới khi bản mới được duyệt (rồi thành `replaced`).
+ */
+export interface AdBanner {
+  id: string;
+  businessId: string;
+  /** Ảnh: chờ duyệt là "ref" vùng riêng (Storage ad-uploads / data URL ở DEMO); đã duyệt là URL công khai */
+  imageUrl: string;
+  /** ≤ 40 ký tự */
+  title: string;
+  /** ≤ 120 ký tự */
+  body: string;
+  status: AdBannerStatus;
+  rejectReason: string | null;
+  submittedAt: ISODate;
+  reviewedAt: ISODate | null;
+  /** Tên người duyệt (quản trị) */
+  reviewedBy: string | null;
+}
+
+/** View ad_banners_public: banner đã duyệt mới nhất mỗi quán (app đọc). */
+export type AdBannerPublic = Pick<AdBanner, 'id' | 'businessId' | 'imageUrl' | 'title' | 'body' | 'reviewedAt'>;
 
 /** Chiến dịch ai cũng xem được (view campaigns_public): không có ngân sách, số đã chi. */
 export type CampaignPublic = Pick<
@@ -396,6 +424,8 @@ export interface Trip {
   openedAt: ISODate | null;
   codeUsedAt: ISODate | null;
   reportedAt: ISODate | null;
+  /** Đã hiện popup quảng cáo nhà tài trợ cho chuyến này (mỗi chuyến tính 1 lượt xem) */
+  adViewedAt: ISODate | null;
 }
 
 export interface PointsEntry {
@@ -440,7 +470,10 @@ export interface WalletTransaction {
   /** "Nạp chuyển khoản", "Trừ 17 mã ngày 21/11" */
   note: string;
   status: 'pending' | 'done' | 'failed';
+  /** Nội dung chuyển khoản riêng của lần nạp ("FREGO CPM1024-2"), mỗi lần nạp một mã khác nhau để khớp đúng dòng. */
   reference: string | null;
+  /** Mã đơn PayOS (nạp qua cổng thanh toán; null khi chuyển khoản tay). Webhook PayOS khớp theo mã này. */
+  orderCode?: number | null;
   createdAt: ISODate;
 }
 
@@ -480,6 +513,19 @@ export interface SupportTicket {
   subject: string;
   status: 'open' | 'pending' | 'done';
   dueAt: ISODate | null;
+  createdAt: ISODate;
+  /** Người gửi là người dùng app (để họ đọc được trả lời). Doanh nghiệp / dữ liệu cũ: null. */
+  requesterId?: string | null;
+}
+
+/** Tin nhắn trong yêu cầu hỗ trợ: lời người gửi và trả lời của Frego (bảng ticket_messages). */
+export interface TicketMessage {
+  id: string;
+  ticketId: string;
+  authorKind: 'requester' | 'admin';
+  /** "Minh Anh", "Hỗ trợ Frego" */
+  authorName: string;
+  body: string;
   createdAt: ISODate;
 }
 

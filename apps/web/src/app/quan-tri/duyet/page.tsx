@@ -1,8 +1,8 @@
-// QT 2 · Duyệt doanh nghiệp và chiến dịch (WebQtDuyet): hàng chờ bên trái (?tab=, ?id=), chi tiết + kiểm tra tự động
+// QT 2 · Duyệt doanh nghiệp, chiến dịch và banner quảng cáo (WebQtDuyet): hàng chờ bên trái (?tab=, ?id=), chi tiết + kiểm tra tự động
 // bên phải, Duyệt / Từ chối kèm lý do. Mục vừa xử lý vẫn hiện trong hàng chờ với nhãn "Đã duyệt" / "Đã từ chối".
 import type { Metadata } from 'next';
 import type { CategoryKey } from '@frego/core';
-import { VoucherTicket, type MerchantLogoKind } from '@/components/app';
+import { AdPopup, VoucherTicket, type MerchantLogoKind } from '@/components/app';
 import {
   BizMark,
   Check,
@@ -25,7 +25,7 @@ import {
 import { adminService } from '@/lib/server/data';
 import { ReviewPanel } from './_components/ReviewPanel';
 
-export const metadata: Metadata = { title: 'Duyệt doanh nghiệp và chiến dịch' };
+export const metadata: Metadata = { title: 'Duyệt doanh nghiệp, chiến dịch và banner' };
 
 type Search = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -43,7 +43,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       <Topbar crumbs="Frego / Duyệt" />
       <PageBody>
         <PageHeader
-          title="Duyệt doanh nghiệp và chiến dịch"
+          title="Duyệt doanh nghiệp, chiến dịch và banner"
           description="Kiểm tra trước khi mã hiện trên app. Mục tiêu: xử lý trong 1 ngày làm việc."
         />
         <Tabs
@@ -69,7 +69,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                         {it.providerId ? (
                           <ProviderMark provider={it.providerId} size={16} />
                         ) : (
-                          <WebIcon name="brief" size={16} className="text-nav-icon" />
+                          <WebIcon name={it.kind === 'banner' ? 'camera' : 'brief'} size={16} className="text-nav-icon" />
                         )}
                         {it.meta}
                       </>
@@ -93,8 +93,31 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
               sub={d.sub}
               leading={<BizMark category={d.category} size={40} />}
               decision={d.decision ? d.decision.chip : null}
+              approveConfirm={d.approveConfirm ?? null}
               left={
-                d.preview ? (
+                d.banner ? (
+                  <>
+                    <SubHeading>Người dùng sẽ thấy</SubHeading>
+                    <PreviewBox padding={14}>
+                      <AdPopup
+                        imageUrl={d.banner.imageUrl}
+                        title={d.banner.title}
+                        body={d.banner.body}
+                        businessName={d.banner.businessName}
+                        category={d.banner.category}
+                        address={d.banner.address}
+                        giftText={d.banner.giftText}
+                      />
+                    </PreviewBox>
+                    <KeyValueList>
+                      {d.facts.map((f) => (
+                        <KeyValue key={f.label} label={f.label}>
+                          {f.value}
+                        </KeyValue>
+                      ))}
+                    </KeyValueList>
+                  </>
+                ) : d.preview ? (
                   <>
                     <SubHeading>Người dùng sẽ thấy</SubHeading>
                     <PreviewBox>

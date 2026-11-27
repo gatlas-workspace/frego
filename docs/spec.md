@@ -27,7 +27,9 @@ Bản đồ tính năng (một luồng qua ba sản phẩm):
 | Quyền dữ liệu | 6 Xin quyền dữ liệu, Tài khoản | Báo cáo chỉ có số liệu tổng | Hỗ trợ và nhật ký: xóa dữ liệu, nhật ký truy cập |
 | Tìm điểm đến, địa điểm đã lưu | 1 Trang chủ, 1b Chọn điểm đến, Thêm địa điểm | — | Bảng giá ước tính: dữ liệu tìm kiếm ẩn danh |
 | Gắn voucher cho chuyến | 2 Gắn voucher | Tạo chiến dịch | Chiến dịch, Kho mã công khai, Điểm và mã Frego |
+| Bản đồ chuyến, quán tài trợ quanh điểm đến | 2 Gắn voucher, 2b So giá: bản đồ thật, đường đi thật, vòng tham chiếu 1 km quanh điểm đến; ghim **chỉ quán có voucher dùng được cho điểm đến** (điểm đến trong vùng tặng mã của quán, đúng giờ, đúng loại xe — khớp danh sách Gắn voucher); chạm ghim xem quán và "Đi tới quán này" | Hồ sơ cửa hàng: địa chỉ, tọa độ | Doanh nghiệp |
 | So giá sau voucher | 2b So giá sau voucher | — | Bảng giá ước tính |
+| Quảng cáo nhà tài trợ (27/11/2026) | 2c Popup quảng cáo: sau khi chọn hãng có mã của quán tài trợ ở 2b → banner đã duyệt của quán (hoặc popup gọn nếu chưa có) → "Nhận mã giảm giá" (bấm được ngay) → 3 | Quảng cáo: tải banner (ảnh + tiêu đề + nội dung), xem trước, trạng thái; Báo cáo + Chi tiết chiến dịch: Lượt xem quảng cáo | Duyệt: tab Banner quảng cáo (duyệt / từ chối kèm lý do) |
 | Mở app hãng kèm mã | 3 Mở app Be, Mở app Grab | — | Đối tác, liên kết |
 | Biết khi mã được dùng | 3b Thông báo | Ví và hóa đơn: trừ tiền mỗi ngày | Tiền và đối soát |
 | Báo giá thật, cộng điểm | 4 Báo giá thật, 7 Điểm thưởng | — | Người dùng, báo giá; Điểm và mã Frego |
@@ -51,11 +53,14 @@ Cộng thêm: landing page cho người đặt xe (cùng màu, font, thành ph�
 
 ## Quy tắc nghiệp vụ
 
-- **Gắn mã**: mỗi hãng + loại xe tối đa 1 mã mỗi chuyến. Frego tự gắn mã giảm nhiều nhất; hòa thì mã hết hạn sớm hơn, rồi mã Frego trước. Gắn theo số tiền người dùng được giảm, không theo tiền tài trợ. Mã không đủ điều kiện ghi rõ lý do.
+- **Mức giảm phải nhỏ hơn giá dự kiến** (chốt 27/11/2026): mã chỉ dùng được khi mức giảm (số tiền, hoặc % có trần tính trên giá) **nhỏ hơn đầu thấp** khoảng giá dự kiến của hãng + loại xe đó, nên giá sau giảm luôn > 0đ. Không hợp thì ghi "mã giảm 20.000đ, không nhỏ hơn giá dự kiến 12.000–14.000đ". Chưa có bảng giá thì không chặn.
+- **Gắn mã**: mỗi hãng + loại xe tối đa 1 mã mỗi chuyến. Gắn theo số tiền người dùng được giảm, không theo tiền tài trợ. Mã không đủ điều kiện ghi rõ lý do.
+- **Cách ưu tiên tự gắn và xếp danh sách** (chốt 27/11/2026, người dùng chọn ở màn Gắn voucher, nhớ trên máy): **Giảm nhiều** (mặc định: giảm nhiều nhất → bằng nhau thì quán gần điểm đến hơn → hết hạn sớm hơn → Frego, tài trợ, công khai) · **Quán gần** (mã của quán gần điểm đến nhất trước; mã không gắn quán xếp sau) · **Sắp hết hạn** (hạn gần nhất trước). Danh sách: mã đang gắn trước, rồi theo cách ưu tiên. Mã của thẻ tài trợ vừa bấm ở Trang chủ luôn được giữ.
 - **Giá ước tính** (`packages/core/src/pricing.ts`): E = giá mở cửa + mỗi km sau 2 km + mỗi phút. Khoảng giá: thấp = E làm tròn xuống nghìn; cao = E × hệ số cao điểm (07:00–09:00, 16:30–19:30) hoặc ×1,05. Chỉ bật khi đủ 30 báo giá mỗi khu vực. Giá sau voucher trừ đúng số tiền của mã.
 - **Ưu đãi chiến dịch**: đặt điểm đến trong vùng quanh quán (bán kính 300 m–1 km), đúng khung giờ → được tặng mã riêng khi mở app hãng. Voucher tặng riêng (chủ động gửi) chỉ khi người dùng bật "Voucher tặng riêng".
 - **Tiền doanh nghiệp**: nạp trước; mỗi mã được dùng trừ giá trị giảm + 3.000đ phí dịch vụ (số mẫu, cần chốt), trừ 00:05 mỗi ngày cho mã hôm trước. Ví hết thì chiến dịch tự dừng. Mã tặng mà không dùng không mất tiền.
-- **Duyệt**: chiến dịch, doanh nghiệp mới phải được Frego duyệt (mục tiêu 1 ngày làm việc). Đổi ngân sách không cần duyệt lại; đổi hãng, mức giảm, vùng, ảnh hoặc địa chỉ quán thì duyệt lại.
+- **Banner quảng cáo** (27/11/2026): chỉ chủ quán gửi; ảnh JPG/PNG/WebP ≤ 1 MB (nên 1200×675), tiêu đề ≤ 40 ký tự, nội dung ≤ 120 ký tự; mỗi lúc một bản chờ duyệt; Frego duyệt (bản cũ chạy tới khi bản mới được duyệt, rồi thành "đã thay"). Không có số điện thoại, mã QR, logo hãng xe, nội dung sai sự thật. Lượt xem: mỗi chuyến tính 1 lần khi popup hiện, chỉ số tổng theo chiến dịch, không lưu ai xem.
+- **Duyệt**: chiến dịch, doanh nghiệp mới, banner quảng cáo phải được Frego duyệt (mục tiêu 1 ngày làm việc). Đổi ngân sách không cần duyệt lại; đổi hãng, mức giảm, vùng, ảnh hoặc địa chỉ quán thì duyệt lại.
 - **Điểm**: báo giá một chạm +10, nhập số tiền +50 (chỉ khi lệch ≤ 30% so với ước tính), biên nhận email +50, nơi chưa có dữ liệu ×2, tối đa 300 điểm mỗi người mỗi ngày (vượt thì giữ lại kiểm tra). Điểm không đổi ra tiền mặt. Quà: Be xe máy −10.000đ (500 điểm), Green SM −15.000đ (1.000), Grab ô tô −20.000đ (1.500).
 - **Mã công khai**: luôn ghi nguồn và giờ kiểm tra; ≥ 10 lượt báo "không dùng được" trong 24 giờ → tự ẩn.
 - **Thông báo**: giờ yên lặng 22:00–7:00; tin ưu đãi chung tối đa 2 tin/tuần, mặc định tắt.

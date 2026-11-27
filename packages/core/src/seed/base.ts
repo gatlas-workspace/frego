@@ -5,6 +5,7 @@
  * Mốc thời gian demo: 22/11/2026 17:45 giờ Việt Nam (Chủ nhật).
  */
 import type {
+  AdBanner,
   AppNotification,
   Business,
   BusinessMember,
@@ -205,9 +206,9 @@ export const partners: Partner[] = [
   { id: 'momo', kind: 'wallet', name: 'MoMo', mono: 'Mo', description: 'Hợp mã đặt xe trả bằng MoMo', integration: 'record_only', sortOrder: 3 },
   { id: 'zalo', kind: 'wallet', name: 'ZaloPay', mono: 'Za', description: 'Hợp mã đặt xe trả bằng ZaloPay', integration: 'record_only', sortOrder: 4 },
   { id: 'shopee', kind: 'wallet', name: 'ShopeePay', mono: 'Sh', description: 'Hợp mã đặt xe trả bằng ShopeePay', integration: 'record_only', sortOrder: 5 },
-  { id: 'be', kind: 'app', name: 'Be', mono: 'Be', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', sortOrder: 6 },
-  { id: 'grab', kind: 'app', name: 'Grab', mono: 'Gr', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', sortOrder: 7 },
-  { id: 'gsm', kind: 'app', name: 'Green SM', mono: 'GS', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', sortOrder: 8 },
+  { id: 'be', kind: 'app', name: 'Be', mono: 'Be', description: 'Bấm nếu bạn có cài app Be để ưu tiên mã cho hãng này', linkedDescription: 'Đã cài app · ưu tiên mã Be khi so giá', integration: 'record_only', sortOrder: 6 },
+  { id: 'grab', kind: 'app', name: 'Grab', mono: 'Gr', description: 'Bấm nếu bạn có cài app Grab để ưu tiên mã cho hãng này', linkedDescription: 'Đã cài app · ưu tiên mã Grab khi so giá', integration: 'record_only', sortOrder: 7 },
+  { id: 'gsm', kind: 'app', name: 'Green SM', mono: 'GS', description: 'Bấm nếu bạn có cài app Green SM để ưu tiên mã cho hãng này', linkedDescription: 'Đã cài app · ưu tiên mã Green SM khi so giá', integration: 'record_only', sortOrder: 8 },
   { id: 'gmail', kind: 'email', name: 'Gmail', mono: 'Gm', description: 'Đọc biên nhận chuyến đi để tự báo giá', integration: 'planned', sortOrder: 9 },
 ];
 
@@ -347,6 +348,7 @@ const camp = (c: Partial<Campaign> & Pick<Campaign, 'id' | 'businessId' | 'name'
   status: 'active',
   rejectReason: null,
   pausedBy: null,
+  adViewCount: 0,
   radiusM: 500,
   hoursFrom: '07:00',
   hoursTo: '22:00',
@@ -381,6 +383,8 @@ export const campaigns: Campaign[] = [
     spent: 7176000,
     issuedCount: 980,
     usedCount: 312,
+    // Banner duyệt 19/11/2026: số lượt hiện popup quảng cáo từ đó.
+    adViewCount: 86,
   }),
   camp({
     id: 'cp-may-xe-may',
@@ -717,6 +721,7 @@ const trip = (t: Partial<Trip> & Pick<Trip, 'id' | 'destPlaceId' | 'destLabel' |
   userId: DEMO_USER_ID,
   originLabel: 'Vị trí hiện tại',
   originPlaceId: null,
+  adViewedAt: null,
   distanceKm: 5.8,
   durationMin: 20,
   attached: [],
@@ -895,5 +900,48 @@ export const notifications: AppNotification[] = [
     link: '/vi',
     createdAt: vn('2026-11-08 10:00'),
     readAt: vn('2026-11-08 12:00'),
+  },
+];
+
+/* ───────────── Banner quảng cáo (popup sau màn So giá) ───────────── */
+
+/** Ảnh banner mẫu 1200×675 (SVG nội tuyến, chưa có kho ảnh thật ở DEMO). Màu là dữ liệu ảnh, không phải token giao diện. */
+const svgBanner = (bg1: string, bg2: string, headline: string, sub: string) =>
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">` +
+      `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/></linearGradient></defs>` +
+      `<rect width="1200" height="675" fill="url(#g)"/>` +
+      `<circle cx="1010" cy="150" r="230" fill="#ffffff" fill-opacity="0.10"/><circle cx="1090" cy="560" r="160" fill="#ffffff" fill-opacity="0.08"/>` +
+      `<text x="80" y="330" font-family="Arial, sans-serif" font-size="88" font-weight="800" fill="#ffffff">${headline}</text>` +
+      `<text x="80" y="420" font-family="Arial, sans-serif" font-size="44" fill="#ffffff" fill-opacity="0.9">${sub}</text>` +
+      `</svg>`,
+  );
+
+export const adBanners: AdBanner[] = [
+  {
+    id: 'ad-may-1',
+    businessId: 'biz-cafe-may',
+    imageUrl: svgBanner('#6B4226', '#B07A4F', 'Cà phê sữa đá', 'Mua 2 tặng 1 · 13:00–19:00'),
+    title: 'Cà phê sữa đá mua 2 tặng 1',
+    body: 'Ghé Cà phê Mây cạnh chợ Bến Thành, đưa màn hình này để được tặng 1 ly khi mua 2. Áp dụng 13:00–19:00.',
+    status: 'approved',
+    rejectReason: null,
+    submittedAt: vn('2026-11-18 10:00'),
+    reviewedAt: vn('2026-11-19 09:30'),
+    reviewedBy: 'Vận hành Frego',
+  },
+  {
+    // Chờ duyệt: để thử bước duyệt ở quản trị. App chưa hiện (Tiệm trà Sen dùng popup gọn).
+    id: 'ad-tra-sen-1',
+    businessId: 'biz-tra-sen',
+    imageUrl: svgBanner('#2F6B4F', '#6FA47F', 'Trà sen Tây Hồ', 'Giảm 15% cho khách đi Be'),
+    title: 'Trà sen Tây Hồ giảm 15%',
+    body: 'Khách đến bằng Be được giảm 15% mọi loại trà sen. Quán cách chợ Bến Thành 150 m.',
+    status: 'pending',
+    rejectReason: null,
+    submittedAt: vn('2026-11-22 16:30'),
+    reviewedAt: null,
+    reviewedBy: null,
   },
 ];

@@ -247,4 +247,76 @@ do $$ begin
 end $$;
 do $$ begin perform pg_temp.reset(); end $$;
 
+-- ───────────── Banner quảng cáo + lượt xem (migration 20261127000800_ad_banners) ─────────────
+
+-- Khách / người dùng app chỉ thấy banner đã duyệt qua view công khai.
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000001'); end $$;
+do $$ begin
+  assert (select count(*) from public.ad_banners) = 0, 'người dùng app không đọc bảng ad_banners';
+  assert (select count(*) from public.ad_banners_public) = 1, 'view công khai chỉ có banner đã duyệt (Cà phê Mây)';
+  assert (select business_id from public.ad_banners_public) = 'biz-cafe-may', 'banner đã duyệt là của Cà phê Mây';
+end $$;
+-- Lượt xem: chuyến Grab ô tô có mã tặng riêng của Cà phê Mây → cộng 1 lần, gọi lại không cộng.
+do $$
+declare t jsonb; r jsonb;
+begin
+  t := public.record_trip(jsonb_build_object(
+    'originLabel', 'Landmark 81', 'destPlaceId', 'ben-thanh', 'destLabel', 'Chợ Bến Thành', 'distanceKm', 5.8, 'durationMin', 20,
+    'attached', jsonb_build_array(jsonb_build_object('service', 'grab-car4', 'source', 'sponsor', 'refId', 'uv:uv-may7k2q',
+      'code', 'MAY7K2Q', 'label', 'Cà phê Mây', 'amount', 20000)),
+    'chosenService', 'grab-car4', 'comparedCount', 3));
+  r := public.record_ad_view(jsonb_build_object('tripId', t->>'id'));
+  assert (r->>'counted')::boolean, 'chuyến có mã của quán tài trợ được tính 1 lượt xem';
+  assert r->>'campaignId' = 'cp-may-chieu', 'tính cho đúng chiến dịch';
+  r := public.record_ad_view(jsonb_build_object('tripId', t->>'id'));
+  assert not (r->>'counted')::boolean, 'mỗi chuyến chỉ tính 1 lần';
+end $$;
+-- Không ghi lượt xem cho chuyến của người khác.
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000002'); end $$;
+do $$ begin
+  perform public.record_ad_view(jsonb_build_object('tripId', (select id from public.trips limit 1)));
+  raise exception 'không được ghi lượt xem cho chuyến không phải của mình';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+do $$ begin
+  assert (select ad_view_count from public.campaigns where id = 'cp-may-chieu') = 87, 'ad_view_count 86 → 87 sau một lượt';
+end $$;
+
+-- Chủ quán: gửi banner chờ duyệt; không tự duyệt, không sửa, không đếm lượt xem, không đụng quán khác.
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000b1'); end $$;
+do $$ begin
+  insert into public.ad_banners (business_id, image_url, title, body) values ('biz-cafe-may', 'storage:ad-uploads/biz-cafe-may/x.png', 'Bánh mới', 'Thử');
+  assert (select count(*) from public.ad_banners where business_id = 'biz-cafe-may') = 2, 'chủ quán thấy banner của quán mình';
+  assert (select count(*) from public.ad_banners where business_id = 'biz-tra-sen') = 0, 'không thấy banner quán khác';
+end $$;
+do $$ begin
+  insert into public.ad_banners (business_id, image_url, title, status) values ('biz-cafe-may', 'x', 'Tự duyệt', 'approved');
+  raise exception 'chủ quán không được tự duyệt banner';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin
+  insert into public.ad_banners (business_id, image_url, title) values ('biz-tra-sen', 'x', 'Quán khác');
+  raise exception 'chủ quán không được gửi banner cho quán khác';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin
+  update public.ad_banners set status = 'approved' where business_id = 'biz-cafe-may' and status = 'pending';
+  assert (select count(*) from public.ad_banners where status = 'approved' and title = 'Bánh mới') = 0, 'chủ quán không sửa được banner';
+end $$;
+do $$ begin
+  update public.campaigns set ad_view_count = 99999 where id = 'cp-may-chieu';
+  raise exception 'chủ quán không được sửa lượt xem';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+
+-- Quản trị ops duyệt banner chờ của Tiệm trà Sen.
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000a1'); end $$;
+do $$ begin
+  update public.ad_banners set status = 'approved', reviewed_at = now(), reviewed_by = 'Vận hành Frego' where id = 'ad-tra-sen-1';
+  assert (select count(*) from public.ad_banners_public) = 2, 'banner vừa duyệt hiện ở view công khai';
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+
 \echo '  RLS + RPC: tất cả kiểm tra đều đúng'

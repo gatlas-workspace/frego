@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@frego/core"],
   // Trang quản lý toàn dữ liệu động; chưa bật Cache Components để giữ mô hình render đơn giản.
   cacheComponents: false,
+  experimental: {
+    // Ảnh banner quảng cáo tối đa 1 MB (AD_IMAGE_MAX_BYTES) + chữ + phần đầu multipart: mặc định 1 MB không đủ.
+    serverActions: { bodySizeLimit: "2mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {

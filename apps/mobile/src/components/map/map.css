@@ -1,0 +1,18 @@
+/* Bản đồ web (Leaflet): nền OpenStreetMap làm nhạt cho gần kiểu CARTO Positron của thongtincty (không cần key CARTO). */
+.frego-tiles {
+  filter: grayscale(0.85) brightness(1.06) contrast(0.88);
+}
+.leaflet-container {
+  font-family: inherit;
+}
+/* Ghim là divIcon: bỏ nền/viền mặc định, viền focus rõ khi dùng bàn phím. */
+.frego-pin {
+  background: transparent;
+  border: none;
+}
+.frego-pin:focus-visible {
+  /* --frego-focus gán từ token colors.primary trên khung bản đồ (MapSurface.web.tsx) */
+  outline: 3px solid var(--frego-focus);
+  outline-offset: 2px;
+  border-radius: 9999px;
+}

@@ -29,3 +29,14 @@ export async function broadcastAction(_prev: BroadcastState, formData: FormData)
     return { ok: false, intent, message: e instanceof Error ? e.message : 'Chưa lưu được tin. Thử lại.', id: input.id ?? undefined, at: Date.now() };
   }
 }
+
+/** Hủy tin đã hẹn (chưa tới giờ gửi): tin chuyển về bản nháp. */
+export async function cancelBroadcastAction(formData: FormData): Promise<void> {
+  const { svc } = await adminOpsService();
+  try {
+    await svc.cancelBroadcast(String(formData.get('id') ?? ''));
+  } catch (e) {
+    console.error('[thong-bao] hủy tin', e);
+  }
+  revalidatePath('/quan-tri/thong-bao');
+}

@@ -103,7 +103,8 @@ const extraBusinesses: Business[] = [
   // Hồ sơ đăng ký mới (chờ duyệt): cửa hàng thứ hai của Nhà sách Gió, cùng mã số thuế với cửa hàng đang hoạt động.
   bizRow({
     id: 'biz-qt-sach-gio-dk',
-    name: 'Nhà sách Gió',
+    // Tên riêng cho cửa hàng thứ hai, tránh trùng với Nhà sách Gió đang hoạt động (có chiến dịch chạy).
+    name: 'Nhà sách Gió Võ Văn Tần',
     category: 'book',
     industry: 'Bán lẻ · Sách, văn phòng phẩm',
     district: 'Quận 3',
@@ -155,6 +156,7 @@ const campRow = (c: CampInput): Campaign => {
     spent: used * (c.amount + FEE),
     issuedCount: issued,
     usedCount: used,
+    adViewCount: 0,
     startsAt: vn('2026-11-01 00:00'),
     endsAt: vn('2026-11-30 23:59'),
     imageUrl: null,
@@ -233,6 +235,7 @@ const ngocLinh: Profile = {
 
 const tripRow = (t: Partial<Trip> & Pick<Trip, 'id' | 'userId' | 'originLabel' | 'destPlaceId' | 'destLabel' | 'createdAt'>): Trip => ({
   originPlaceId: null,
+  adViewedAt: null,
   distanceKm: 4.2,
   durationMin: 16,
   attached: [],
@@ -373,7 +376,7 @@ export const adminSeed: Partial<Seed> = {
   trips: extraTrips,
   points_ledger: extraLedger,
   support_tickets: [
-    { id: 'st-1', requesterName: 'Gia Huy', requesterKind: 'user', topic: 'points', subject: 'Chưa được cộng điểm báo giá', status: 'open', dueAt: null, createdAt: vn('2026-11-22 08:30') },
+    { id: 'st-1043', requesterName: 'Gia Huy', requesterKind: 'user', topic: 'points', subject: 'Chưa được cộng điểm báo giá', status: 'open', dueAt: null, createdAt: vn('2026-11-22 08:30') },
   ],
   audit_logs: [
     { id: 'al-1', actorName: 'Vận hành Frego', actorRole: 'ops', action: 'Xem chi tiết người dùng Minh Anh', createdAt: vn('2026-11-22 10:02') },

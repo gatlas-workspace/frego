@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import type { RewardView } from '@frego/core';
-import { InfoNote, ListCard, ListRow, ScreenHeader, SectionTitle, T } from '@/components/ui';
+import { Button, InfoNote, ListCard, ListRow, ModalSheet, ScreenHeader, SectionTitle, T } from '@/components/ui';
 import { PointsHero } from '@/components/screens/wallet/PointsHero';
 import { ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
 import { RewardTicket } from '@/components/screens/wallet/RewardTicket';
@@ -24,6 +24,10 @@ export default function PointsScreen() {
   /** Quà đã đổi trong lần mở màn này (hiện nhãn "Đã đổi") và lời xác nhận gần nhất. */
   const [redeemed, setRedeemed] = useState<string[]>([]);
   const [confirmText, setConfirmText] = useState<string | null>(null);
+  /** Hỏi lại trước khi trừ điểm (27/11/2026): điểm đã đổi không hoàn lại. */
+  const [ask, setAsk] = useState<RewardView | null>(null);
+  // Đóng hộp sau cú bấm (tránh "click" rơi xuống nút Đổi nằm dưới).
+  const closeAsk = () => setTimeout(() => setAsk(null), 80);
   const redeem = useMutation({
     mutationFn: (r: RewardView) => svc.redeemReward(r.id),
     onSuccess: (_res, r) => {
@@ -68,7 +72,7 @@ export default function PointsScreen() {
                   reward={r}
                   redeemed={redeemed.includes(r.id)}
                   busy={redeem.isPending}
-                  onRedeem={() => redeem.mutate(r)}
+                  onRedeem={() => setAsk(r)}
                 />
               ))}
             </View>
@@ -88,6 +92,24 @@ export default function PointsScreen() {
           </T>
         </ScrollView>
       )}
+      {ask ? (
+        <ModalSheet onDismiss={closeAsk} dismissLabel="Để sau" gap={14}>
+          <T weight={800} size={20} lineHeight={26} accessibilityRole="header">
+            {`Đổi ${ask.costText} lấy voucher ${ask.serviceText} ${ask.amountText}?`}
+          </T>
+          <T size={15} lineHeight={22} color={colors.ink2}>
+            Voucher vào Ví ngay. Điểm đã đổi không hoàn lại được.
+          </T>
+          <Button
+            label="Đổi điểm"
+            onPress={() => {
+              redeem.mutate(ask);
+              closeAsk();
+            }}
+          />
+          <Button label="Để sau" variant="ghost" onPress={closeAsk} />
+        </ModalSheet>
+      ) : null}
     </View>
   );
 }

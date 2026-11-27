@@ -7,6 +7,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import {
   createAdminOpsService,
   createAdminService,
@@ -56,6 +57,19 @@ export async function getDb(): Promise<Db> {
   const db = createSupabaseDb(await supabaseServerClient());
   await db.refreshUser();
   return db;
+}
+
+/**
+ * Db cho việc máy chủ tự làm, không theo người đăng nhập (webhook PayOS đã kiểm chữ ký).
+ * Supabase: khóa service_role (SUPABASE_SERVICE_ROLE_KEY, chỉ ở máy chủ) — chỉ dùng gọi RPC tin cậy như payos_credit_topup.
+ * DEMO: CSDL bộ nhớ, không gắn người dùng.
+ */
+export function trustedServerDb(): Db | null {
+  if (MODE === 'demo') return demoDb();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return null;
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createSupabaseDb(client);
 }
 
 /** Supabase client phía server, đọc/ghi cookie phiên (chỉ dùng khi MODE === 'supabase'). */

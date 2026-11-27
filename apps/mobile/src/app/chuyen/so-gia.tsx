@@ -1,9 +1,10 @@
 // Màn 2b · So giá sau voucher (thiết kế ChonHang-v2.dc.html)
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { Redirect, router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { VEHICLE_TABS, type PriceRow } from '@frego/core';
-import { Icon, InfoNote, PriceRowCard, SectionTitle, Sheet, T, Tabs } from '@/components/ui';
+import { VEHICLE_TABS, type PriceRow, type Selection } from '@frego/core';
+import { Button, Icon, InfoNote, ModalSheet, PriceRowCard, SectionTitle, Sheet, T, Tabs } from '@/components/ui';
 import { MapHeader } from '@/components/screens/flow/MapHeader';
 import { ErrorState, LoadingBlocks } from '@/components/screens/flow/ScreenState';
 import { refreshAll, useApi } from '@/lib/api';
@@ -11,8 +12,12 @@ import { useTripFlow } from '@/lib/trip-flow';
 import { colors, HIT, radius } from '@/theme/tokens';
 
 export default function CompareScreen() {
-  const { svc } = useApi();
-  const { plan, selection, vehicleClass, setVehicleClass, setOpenView } = useTripFlow();
+  const { svc, guest } = useApi();
+  const { plan, selection, vehicleClass, setVehicleClass, setOpenView, setSponsorAd } = useTripFlow();
+  /** Khách bấm hãng có mã của quán tài trợ: mời đăng nhập (chốt 27/11/2026 — khách không nhận mã của quán). */
+  const [askLogin, setAskLogin] = useState<string | null>(null);
+  // Đóng hộp sau cú bấm (tránh "click" rơi xuống thẻ hãng nằm dưới).
+  const closeAskLogin = () => setTimeout(() => setAskLogin(null), 80);
 
   const comparison = useQuery({
     queryKey: ['compare', plan?.dest.id, plan?.at, selection, vehicleClass],
@@ -22,13 +27,29 @@ export default function CompareScreen() {
   });
 
   const open = useMutation({
-    mutationFn: (row: PriceRow) => svc.openProvider(plan!, selection, row),
-    onSuccess: (view) => {
+    mutationFn: async (row: PriceRow) => {
+      // Khách: bỏ mã của quán tài trợ ở các hãng khác để không phát mã (máy chủ cũng chặn).
+      const sel: Selection = guest
+        ? Object.fromEntries(
+            Object.entries(selection).filter(
+              ([, refId]) => plan!.evaluation.eligible.find((e) => e.offer.refId === refId)?.offer.source !== 'sponsor',
+            ),
+          )
+        : selection;
+      const view = await svc.openProvider(plan!, sel, row);
+      // Mã gắn ở hãng này là của quán tài trợ → popup quảng cáo trước (màn 2c); lỗi thì bỏ qua, không chặn luồng.
+      const ad = await svc.sponsorAd(plan!, row).catch(() => null);
+      return { view, ad };
+    },
+    onSuccess: ({ view, ad }) => {
       setOpenView(view);
+      setSponsorAd(ad);
       refreshAll();
-      router.push('/chuyen/mo-app');
+      router.push(ad ? '/chuyen/quang-cao' : '/chuyen/mo-app');
     },
   });
+
+  const [mapOpen, setMapOpen] = useState(false);
 
   if (!plan) return <Redirect href="/tim-kiem" />;
 
@@ -39,8 +60,19 @@ export default function CompareScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <MapHeader from={from} to={plan.dest.name} backLabel="Quay lại bước gắn voucher" onBack={toAttach} />
-      <Sheet title={plan.title} subtitle={plan.subtitle} contentStyle={{ paddingTop: 2, paddingBottom: 28, gap: 14 }}>
+      <MapHeader from={from} to={plan.dest.name} backLabel="Quay lại bước gắn voucher" onBack={toAttach}
+        expanded={mapOpen}
+        onExpandedChange={setMapOpen}
+        onTripChanged={toAttach}
+        vehicleClass={vehicleClass}
+      />
+      <Sheet
+        title={plan.title}
+        subtitle={plan.subtitle}
+        contentStyle={{ paddingTop: 2, paddingBottom: 28, gap: 14 }}
+        collapsed={mapOpen}
+        onCollapsedChange={setMapOpen}
+      >
         {/* Đã gắn N voucher · Đổi */}
         <Pressable
           onPress={toAttach}
@@ -108,7 +140,15 @@ export default function CompareScreen() {
         ) : (
           <View accessibilityRole="list" accessibilityLabel="Giá sau voucher theo hãng" style={{ gap: 12, opacity: open.isPending ? 0.6 : 1 }}>
             {c.rows.map((r) => (
-              <PriceRowCard key={r.service} row={r} onPress={() => !open.isPending && open.mutate(r)} />
+              <PriceRowCard
+                key={r.service}
+                row={r}
+                onPress={() => {
+                  if (open.isPending) return;
+                  if (guest && r.attached?.offer.source === 'sponsor') setAskLogin(r.attached.offer.label);
+                  else open.mutate(r);
+                }}
+              />
             ))}
           </View>
         )}
@@ -121,6 +161,26 @@ export default function CompareScreen() {
           Giá sau voucher vẫn là ước tính. Hãng có thể từ chối mã nếu chuyến không đủ điều kiện.
         </T>
       </Sheet>
+
+      {askLogin ? (
+        <ModalSheet onDismiss={closeAskLogin} dismissLabel="Đóng, chọn hãng khác" gap={14}>
+          <T weight={800} size={20} lineHeight={26} accessibilityRole="header">
+            Đăng nhập để nhận mã của quán
+          </T>
+          <T size={15} lineHeight={22} color={colors.ink2}>
+            Mã giảm giá của {askLogin} là quà riêng cho tài khoản đã xác thực số điện thoại. Đăng nhập mất khoảng 30 giây, rồi
+            so giá lại để nhận mã. Hãng không có mã của quán thì bạn vẫn mở app được ngay.
+          </T>
+          <Button
+            label="Đăng nhập"
+            onPress={() => {
+              setAskLogin(null);
+              router.push('/dang-nhap');
+            }}
+          />
+          <Button label="Chọn hãng khác" variant="ghost" onPress={closeAskLogin} />
+        </ModalSheet>
+      ) : null}
     </View>
   );
 }

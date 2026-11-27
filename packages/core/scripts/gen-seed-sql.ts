@@ -13,7 +13,7 @@ const ORDER: BaseTableName[] = [
   'places', 'partners', 'fare_tables', 'profiles', 'consents', 'notification_prefs', 'saved_places', 'recent_searches',
   'linked_accounts', 'businesses', 'business_members', 'campaigns', 'campaign_events', 'frego_codes', 'rewards',
   'user_vouchers', 'public_codes', 'code_votes', 'trips', 'points_ledger', 'notifications', 'wallet_transactions',
-  'invoices', 'redemptions', 'support_tickets', 'audit_logs', 'broadcasts', 'stats',
+  'invoices', 'redemptions', 'support_tickets', 'ticket_messages', 'audit_logs', 'broadcasts', 'stats', 'ad_banners',
 ];
 
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useState, useTransition } from 'react';
 import { Button, Callout, FieldGrid, FormSection, Input } from '@/components/web';
 import { FilePick } from '@/app/doanh-nghiep/_components/FilePick';
 import { useFormSubmit } from '@/app/doanh-nghiep/_lib/use-form-submit';
-import { registerBusinessAction } from '../actions';
+import { registerBusinessAction, saveRegisteredPinAction } from '../actions';
+import { PinMap } from './PinMap';
 
 /** Form Đăng ký doanh nghiệp (WebDnDangKy): 4 mục, "Lưu nháp" / "Gửi đăng ký", gửi xong hiện khối xác nhận. */
 export function RegisterForm({ needPassword }: { needPassword: boolean }) {
@@ -15,9 +17,19 @@ export function RegisterForm({ needPassword }: { needPassword: boolean }) {
 
   if (state.status === 'ok') {
     return (
-      <div role="status" className="flex flex-col gap-3 pt-3">
-        <Callout tone="green" icon="check" text={state.message} />
-        {state.note ? <Callout tone="amber" text={state.note} /> : null}
+      <div className="flex flex-col gap-4 pt-3">
+        <div role="status" className="flex flex-col gap-3">
+          <Callout tone="green" icon="check" text={state.message} />
+          {state.note ? <Callout tone="amber" text={state.note} /> : null}
+        </div>
+        {state.data?.businessId ? (
+          <PinStep
+            businessId={String(state.data.businessId)}
+            lat={Number(state.data.lat)}
+            lng={Number(state.data.lng)}
+            email={String(state.data.email ?? '')}
+          />
+        ) : null}
       </div>
     );
   }
@@ -106,5 +118,38 @@ export function RegisterForm({ needPassword }: { needPassword: boolean }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Bước 2: ghim vị trí cửa hàng trên bản đồ, rồi "Tiếp theo là gì / đăng nhập thế nào". */
+function PinStep({ businessId, lat, lng, email }: { businessId: string; lat: number; lng: number; email: string }) {
+  const [saved, setSaved] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saving, startSave] = useTransition();
+  const save = (p: { lat: number; lng: number }) =>
+    startSave(async () => {
+      const r = await saveRegisteredPinAction(businessId, p.lat, p.lng);
+      setSaved({ ok: r.status === 'ok', text: r.message ?? '' });
+    });
+  return (
+    <>
+      <FormSection step={5} title="Ghim vị trí" id="dk-ghim" labelWidth={150}>
+        <p className="m-0 text-[14px] leading-normal text-ink-2">
+          Kéo bản đồ để ghim đỏ nằm đúng cửa ra vào của cửa hàng. Vùng áp dụng của mã (VD 500 m quanh quán) tính từ ghim này.
+        </p>
+        <PinMap initial={{ lat, lng }} saving={saving} onSave={save} />
+        {saved ? <Callout tone={saved.ok ? 'green' : 'red'} icon={saved.ok ? 'check' : 'x'} role={saved.ok ? 'status' : 'alert'} text={saved.text} /> : null}
+      </FormSection>
+      <FormSection step={6} title="Tiếp theo" id="dk-tiep-theo" labelWidth={150}>
+        <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-[14px] leading-normal">
+          <li>Frego xem hồ sơ trong 1 ngày làm việc, có thể gọi số điện thoại bạn khai để xác nhận.</li>
+          <li>Kết quả gửi qua email{email ? ` ${email}` : ''}. Thiếu giấy tờ thì Frego nhắc bổ sung.</li>
+          <li>
+            Đăng nhập cổng doanh nghiệp ở <Link href="/dang-nhap?vai-tro=doanh-nghiep">trang Đăng nhập</Link> bằng email
+            {email ? ` ${email}` : ' đã đăng ký'} và mật khẩu đã tạo khi gửi hồ sơ.
+          </li>
+          <li>Được duyệt: nạp ví (VietQR hoặc chuyển khoản) rồi tạo chiến dịch đầu tiên.</li>
+        </ol>
+      </FormSection>
+    </>
   );
 }

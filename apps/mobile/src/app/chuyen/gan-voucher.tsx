@@ -3,8 +3,8 @@ import { useMutation } from '@tanstack/react-query';
 import { Redirect, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
-import { toggleSelection } from '@frego/core';
-import { BottomBar, Button, Card, Field, InfoNote, ListCard, SectionTitle, Sheet, T, VoucherTicket } from '@/components/ui';
+import { OFFER_PRIORITIES, toggleSelection } from '@frego/core';
+import { BottomBar, Button, Card, Field, InfoNote, ListCard, Pill, SectionTitle, Sheet, T, Tabs, VoucherTicket } from '@/components/ui';
 import { MapHeader } from '@/components/screens/flow/MapHeader';
 import { useApi } from '@/lib/api';
 import { useTripFlow } from '@/lib/trip-flow';
@@ -14,20 +14,23 @@ type CodeNote = { ok: boolean; text: string };
 
 export default function AttachScreen() {
   const { svc } = useApi();
-  const { plan, selection, setSelection } = useTripFlow();
+  const { plan, selection, setSelection, priority, setPriority } = useTripFlow();
   const [code, setCode] = useState('');
   const [note, setNote] = useState<CodeNote | null>(null);
+  /** Mã đã nhập mà Frego chưa có dữ liệu: giữ để người dùng nhớ nhập trong app hãng (không tính vào giá). */
+  const [unknownCodes, setUnknownCodes] = useState<string[]>([]);
+  const [mapOpen, setMapOpen] = useState(false);
 
-  const items = useMemo(() => (plan ? svc.attachItems(plan, selection) : []), [svc, plan, selection]);
+  const items = useMemo(() => (plan ? svc.attachItems(plan, selection, priority) : []), [svc, plan, selection, priority]);
 
   const addCode = useMutation({
     mutationFn: (input: string) => svc.addCustomCode(plan!, input),
-    onSuccess: ({ matched, message }, input) => {
+    onSuccess: ({ matched, message, unknown }) => {
       if (matched) setSelection({ ...selection, [matched.service]: matched.offer.refId });
-      // Mã không hợp: giữ ô nhập để thử mã khác.
-      const bad = !matched && plan!.evaluation.ineligible.some((e) => e.offer.code.toUpperCase() === input.toUpperCase());
-      setNote({ ok: !bad, text: message });
-      if (!bad) setCode('');
+      if (unknown) setUnknownCodes((list) => (list.includes(unknown) ? list : [...list, unknown]));
+      setNote({ ok: !!matched, text: message });
+      // Ô nhập luôn còn để thử mã khác; chỉ xóa chữ khi mã đã được ghi nhận.
+      if (matched || unknown) setCode('');
     },
     onError: () => setNote({ ok: false, text: 'Chưa kiểm tra được mã. Thử lại sau giây lát.' }),
   });
@@ -48,10 +51,14 @@ export default function AttachScreen() {
         to={plan.dest.name}
         backLabel="Quay lại chọn điểm đến"
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/tim-kiem'))}
+        expanded={mapOpen}
+        onExpandedChange={setMapOpen}
       />
       <Sheet
         title={plan.title}
         subtitle={plan.subtitle}
+        collapsed={mapOpen}
+        onCollapsedChange={setMapOpen}
         footer={
           <BottomBar>
             <Button label={svc.attachCta(selection)} onPress={() => router.push('/chuyen/so-gia')} />
@@ -60,10 +67,17 @@ export default function AttachScreen() {
       >
         <InfoNote icon="pinok" title={`Điểm đến vẫn là ${plan.dest.name}`} text="Voucher chỉ giảm giá, không đổi địa chỉ đến." />
 
-        <View style={{ gap: 6 }}>
+        <View style={{ gap: 10 }}>
           <SectionTitle text="Gắn voucher trước khi so giá" />
-          <T size={13} lineHeight={20} color={colors.ink2}>
-            Frego đã gắn sẵn mã giảm nhiều nhất cho từng hãng. Mỗi hãng dùng 1 mã mỗi chuyến, bấm Gắn để đổi.
+          {/* Cách ưu tiên: quyết định mã được tự gắn cho từng hãng và thứ tự danh sách (chốt 27/11/2026). */}
+          <Tabs
+            items={OFFER_PRIORITIES}
+            value={priority}
+            onChange={(k) => k !== priority && setPriority(k)}
+            accessibilityLabel="Ưu tiên mã"
+          />
+          <T size={13} lineHeight={20} color={colors.ink2} accessibilityLiveRegion="polite">
+            {OFFER_PRIORITIES.find((p) => p.key === priority)?.hint} Mỗi hãng dùng 1 mã mỗi chuyến, bấm Gắn để đổi.
           </T>
         </View>
 
@@ -96,7 +110,7 @@ export default function AttachScreen() {
           <T weight={800} size={15} lineHeight={20} nativeID="nhap-ma-khac">
             Có mã khác? Nhập để tính vào giá
           </T>
-          {note?.ok ? null : (
+          {(
             <Field
               accessibilityLabel="Có mã khác? Nhập để tính vào giá"
               placeholder="Mã Grab, Be, Green SM"
@@ -115,6 +129,24 @@ export default function AttachScreen() {
           {note ? (
             <View role="status">
               <InfoNote tone={note.ok ? 'tint' : 'neutral'} icon={note.ok ? 'check' : 'info'} text={note.text} live />
+            </View>
+          ) : null}
+          {unknownCodes.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              <T weight={700} size={13} lineHeight={18} color={colors.ink2}>
+                Mã bạn nhập (chưa xác minh, nhập trong app hãng)
+              </T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {unknownCodes.map((c) => (
+                  <Pill
+                    key={c}
+                    label={c}
+                    icon="x"
+                    accessibilityLabel={`Bỏ mã ${c}`}
+                    onPress={() => setUnknownCodes((list) => list.filter((x) => x !== c))}
+                  />
+                ))}
+              </View>
             </View>
           ) : null}
         </Card>

@@ -3,6 +3,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { T } from '@/components/ui';
 import { colors, radius } from '@/theme/tokens';
 import { ProgressBar } from './ProgressBar';
+import { svgHidden } from '@/components/ui/a11y';
 
 export interface PointsHeroProps {
   pointsText: string;
@@ -26,8 +27,7 @@ export function PointsHero({ pointsText, progress, progressText }: PointsHeroPro
         viewBox="0 0 350 180"
         pointerEvents="none"
         style={{ position: 'absolute', right: 0, top: 0 }}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
+        {...svgHidden}
       >
         <Circle cx={330} cy={0} r={96} fill={colors.bannerCircle1} />
         <Circle cx={300} cy={190} r={60} fill={colors.bannerCircle2} />

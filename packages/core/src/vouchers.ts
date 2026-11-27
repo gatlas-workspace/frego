@@ -71,6 +71,8 @@ export interface EligibleOffer {
   conditionLine: string;
   metaText: string;
   tag: 'sponsor' | 'frego' | 'public';
+  /** Khoảng cách điểm đến → quán (m) với mã của quán tài trợ; null với mã không gắn quán (Frego, công khai) */
+  distanceM: number | null;
 }
 
 export interface IneligibleOffer {
@@ -121,15 +123,34 @@ export function ineligibleReason(offer: CodeOffer, service: ServiceKey, ctx: Tri
   if (offer.hours && !withinHours(ctx.at, offer.hours)) {
     return `chỉ dùng từ ${offer.hours.from} đến ${offer.hours.to}`;
   }
+  // Chốt 27/11/2026: mức giảm phải nhỏ hơn đầu thấp của giá dự kiến (giá sau giảm luôn > 0đ).
+  // Chưa có bảng giá cho hãng + loại xe này thì không chặn.
+  const fare = fareFor(ctx, service);
+  if (fare) {
+    const nominal = nominalDiscount(offer, fare.low);
+    if (nominal >= fare.low) {
+      return `mã giảm ${formatVnd(nominal)}, không nhỏ hơn giá dự kiến ${formatVndRange(fare.low, fare.high)}`;
+    }
+  }
   return null;
+}
+
+/** Mức giảm danh nghĩa của mã (chưa cắt theo giá): số tiền cố định, hoặc % (có trần) tính trên `fare`. */
+function nominalDiscount(offer: Pick<CodeOffer, 'amount' | 'percent' | 'maxAmount'>, fare: number): number {
+  if (offer.percent) {
+    const d = Math.round((fare * offer.percent) / 1000) * 1000;
+    return Math.min(d, offer.maxAmount ?? d);
+  }
+  return offer.amount ?? 0;
 }
 
 function conditionLine(offer: CodeOffer, ctx: TripContext): string {
   if (offer.source === 'frego') return offer.description ?? 'Mã riêng Frego.';
   if (offer.source === 'sponsor' && offer.area) {
     const radius = formatMeters(offer.area.radiusM);
-    if (offer.inWallet) return `Tặng riêng cho bạn. Điểm đến trong vùng ${radius} quanh quán.`;
     const d = formatMeters(roundMeters(distanceM(ctx.dest, offer.area)));
+    // Có khoảng cách để người dùng so khi xếp theo "Quán gần nhất".
+    if (offer.inWallet) return `Tặng riêng cho bạn. Điểm đến cách quán ${d}, trong vùng ${radius}.`;
     return `Điểm đến cách quán ${d}, trong vùng áp dụng ${radius}.`;
   }
   const parts: string[] = [];
@@ -191,6 +212,7 @@ export function evaluateOffers(offers: CodeOffer[], ctx: TripContext): OfferEval
           conditionLine: conditionLine(offer, ctx),
           metaText: metaText(offer),
           tag: offer.source,
+          distanceM: offer.area ? Math.round(distanceM(ctx.dest, offer.area)) : null,
         };
       }
     }
@@ -199,33 +221,57 @@ export function evaluateOffers(offers: CodeOffer[], ctx: TripContext): OfferEval
     else if (firstReason && (offer.inWallet || offer.source !== 'sponsor')) ineligible.push({ offer, line: `${PROVIDERS[offer.providerId].name} · ${firstReason}` });
   }
 
-  const autoSelection: Selection = {};
-  const rank = (e: EligibleOffer) => [
-    -e.discount,
-    e.offer.expiresAt ? new Date(e.offer.expiresAt).getTime() : Number.MAX_SAFE_INTEGER,
-    e.offer.source === 'frego' ? 0 : e.offer.source === 'sponsor' ? 1 : 2,
-  ];
+  const autoSelection = autoSelect(eligible, 'discount');
+  const sorted = sortEligible(eligible, autoSelection, 'discount');
+  return { eligible: sorted, ineligible, autoSelection };
+}
+
+/**
+ * Cách ưu tiên khi tự gắn mã và xếp danh sách (người dùng chọn ở màn Gắn voucher, chốt 27/11/2026):
+ * - discount: giảm nhiều nhất (mặc định); bằng nhau → quán gần điểm đến hơn → sắp hết hạn → Frego, tài trợ, công khai.
+ * - nearest: mã của quán gần điểm đến nhất trước; mã không gắn với quán (Frego, công khai) sau; rồi giảm nhiều hơn.
+ * - expiring: mã sắp hết hạn trước; rồi giảm nhiều hơn, quán gần hơn.
+ */
+export type OfferPriority = 'discount' | 'nearest' | 'expiring';
+
+/** label ngắn để 3 ô vừa một hàng ở màn 320 px; hint ghi đầy đủ ở dòng dưới. */
+export const OFFER_PRIORITIES: { key: OfferPriority; label: string; hint: string }[] = [
+  { key: 'discount', label: 'Giảm nhiều', hint: 'Frego đã gắn sẵn mã giảm nhiều nhất cho từng hãng.' },
+  { key: 'nearest', label: 'Quán gần', hint: 'Frego đã gắn sẵn mã của quán gần điểm đến nhất cho từng hãng.' },
+  { key: 'expiring', label: 'Sắp hết hạn', hint: 'Frego đã gắn sẵn mã sắp hết hạn nhất cho từng hãng.' },
+];
+
+const FAR = Number.MAX_SAFE_INTEGER;
+const expiryOf = (e: EligibleOffer) => (e.offer.expiresAt ? new Date(e.offer.expiresAt).getTime() : FAR);
+const sourceOrder = (e: EligibleOffer) => (e.offer.source === 'frego' ? 0 : e.offer.source === 'sponsor' ? 1 : 2);
+
+function rankOf(e: EligibleOffer, priority: OfferPriority): number[] {
+  const dist = e.distanceM ?? FAR;
+  if (priority === 'nearest') return [dist, -e.discount, expiryOf(e), sourceOrder(e)];
+  if (priority === 'expiring') return [expiryOf(e), -e.discount, dist, sourceOrder(e)];
+  return [-e.discount, dist, expiryOf(e), sourceOrder(e)];
+}
+
+function compareRank(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i]! - b[i]!;
+  return 0;
+}
+
+/** Tự gắn: mỗi nhóm hãng + loại xe một mã, đứng đầu theo cách ưu tiên. */
+export function autoSelect(eligible: EligibleOffer[], priority: OfferPriority = 'discount'): Selection {
+  const sel: Selection = {};
   const groups = new Map<ServiceKey, EligibleOffer[]>();
   for (const e of eligible) groups.set(e.service, [...(groups.get(e.service) ?? []), e]);
   for (const [service, list] of groups) {
-    const sorted = [...list].sort((a, b) => {
-      const ra = rank(a);
-      const rb = rank(b);
-      for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
-      return 0;
-    });
-    autoSelection[service] = sorted[0].offer.refId;
+    sel[service] = [...list].sort((a, b) => compareRank(rankOf(a, priority), rankOf(b, priority)))[0]!.offer.refId;
   }
+  return sel;
+}
 
-  // Thứ tự hiển thị: theo thứ tự nhóm được gắn, mã đang gắn trước.
-  eligible.sort((a, b) => {
-    const aSel = autoSelection[a.service] === a.offer.refId ? 0 : 1;
-    const bSel = autoSelection[b.service] === b.offer.refId ? 0 : 1;
-    if (aSel !== bSel) return aSel - bSel;
-    return b.discount - a.discount;
-  });
-
-  return { eligible, ineligible, autoSelection };
+/** Thứ tự danh sách: mã đang gắn trước, rồi theo cách ưu tiên. */
+export function sortEligible(eligible: EligibleOffer[], selection: Selection, priority: OfferPriority = 'discount'): EligibleOffer[] {
+  const attached = (e: EligibleOffer) => (selection[e.service] === e.offer.refId ? 0 : 1);
+  return [...eligible].sort((a, b) => attached(a) - attached(b) || compareRank(rankOf(a, priority), rankOf(b, priority)));
 }
 
 /** Bật/tắt gắn một mã: mỗi nhóm tối đa 1 mã. */

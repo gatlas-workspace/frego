@@ -1,6 +1,7 @@
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { icons, type IconName } from '@frego/core';
 import { colors } from '@/theme/tokens';
+import { svgHidden } from './a11y';
 
 export interface IconProps {
   name: IconName;
@@ -22,8 +23,7 @@ export function Icon({ name, size = 22, color = colors.ink, strokeWidth = 1.8 }:
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      {...svgHidden}
       pointerEvents="none"
     >
       {shapes.map((s, i) => {

@@ -7,9 +7,14 @@ import { PROVIDERS, SERVICES, parseServiceKey, serviceShortLabel } from '../cata
 import { formatDiscount, formatNumber, formatVnd } from '../format';
 import { POINTS_RULES } from '../catalog';
 import { DEMO_NOW } from '../seed/base';
-import type { Db, ListOptions, RpcName, Rpcs } from './types';
+import type { Db, FileStore, ListOptions, RpcName, Rpcs } from './types';
 import { PRIMARY_KEYS, type BaseTableName, type Row, type Seed, type TableName } from './schema';
 import type { AppNotification, Trip, UserVoucher } from '../types';
+
+/** Biên nhận khớp chuyến mở app hãng trong 3 giờ trước đó (SQL: interval '3 hours'). */
+export const RECEIPT_MATCH_WINDOW_MS = 3 * 3600_000;
+/** Cho phép giờ trên biên nhận sớm hơn lúc mở app tối đa 15 phút (lệch đồng hồ; SQL: interval '15 minutes'). */
+export const RECEIPT_CLOCK_SKEW_MS = 15 * 60_000;
 
 export function uid(): string {
   // UUID v4 đủ dùng cho DEMO (Hermes không chắc có crypto.randomUUID).
@@ -112,9 +117,32 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
             new Date(c.endsAt).getTime() > nowT,
         })) as unknown as Row<T>[];
     }
+    if (t === 'ad_banners_public') {
+      // Giống view SQL: banner đã duyệt mới nhất của mỗi quán đang hoạt động.
+      const active = new Set(data.businesses.filter((b) => b.status === 'active').map((b) => b.id));
+      const latest = new Map<string, (typeof data.ad_banners)[number]>();
+      for (const a of data.ad_banners ?? []) {
+        if (a.status !== 'approved' || !active.has(a.businessId)) continue;
+        const cur = latest.get(a.businessId);
+        if (!cur || (a.reviewedAt ?? '') > (cur.reviewedAt ?? '')) latest.set(a.businessId, a);
+      }
+      return [...latest.values()].map((a) => ({
+        id: a.id,
+        businessId: a.businessId,
+        imageUrl: a.imageUrl,
+        title: a.title,
+        body: a.body,
+        reviewedAt: a.reviewedAt,
+      })) as unknown as Row<T>[];
+    }
+    if (t === 'gmail_connections_public') {
+      // Giống view SQL gmail_connections_public: chỉ dòng của người đang đăng nhập, không có token.
+      return (data.gmail_connections ?? []).filter((c) => c.userId === userId) as unknown as Row<T>[];
+    }
     return (data as unknown as Record<string, Row<T>[]>)[t];
   }
-  const isView = (t: TableName) => t === 'businesses_public' || t === 'campaigns_public';
+  const isView = (t: TableName) =>
+    t === 'businesses_public' || t === 'campaigns_public' || t === 'ad_banners_public' || t === 'gmail_connections_public';
   const base = <T extends TableName>(t: T): Row<T>[] => {
     if (isView(t)) throw new Error(`${t} là view chỉ đọc`);
     return (data as unknown as Record<string, Row<T>[]>)[t as BaseTableName];
@@ -131,6 +159,7 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
     snapshot: () => clone(data),
     currentUserId: () => userId,
     now,
+    files: memoryFiles,
 
     async list<T extends TableName>(table: T, o: ListOptions<Row<T>> = {}) {
       let rows = rowsOf(table).slice();
@@ -223,6 +252,10 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
   const rpcs: { [N in RpcName]: (a: Rpcs[N]['args']) => Rpcs[N]['result'] } = {
     record_trip(a) {
       const u = requireUser();
+      // Như SQL: khách (chưa có số điện thoại) không được phát mã của quán tài trợ.
+      if (!profile(u).phone && a.attached.some((c) => c.refId.startsWith('cp:'))) {
+        throw new Error('Cần đăng nhập để nhận mã của quán');
+      }
       const t = now().toISOString();
       const attached = a.attached.map((c) => {
         if (!c.refId.startsWith('cp:')) return c;
@@ -279,11 +312,15 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         openedAt: a.chosenService ? t : null,
         codeUsedAt: null,
         reportedAt: null,
+        adViewedAt: null,
       };
       data.trips.push(trip);
-      const recent = data.recent_searches.find((r) => r.userId === u && r.placeId === a.destPlaceId);
-      if (recent) recent.searchedAt = t;
-      else data.recent_searches.push({ id: uid(), userId: u, placeId: a.destPlaceId, searchedAt: t });
+      // Như SQL (record_trip): chỉ lưu "Tìm gần đây" khi điểm đến có trong places (không lưu "biz:…", "geo:…").
+      if (data.places.some((p) => p.id === a.destPlaceId)) {
+        const recent = data.recent_searches.find((r) => r.userId === u && r.placeId === a.destPlaceId);
+        if (recent) recent.searchedAt = t;
+        else data.recent_searches.push({ id: uid(), userId: u, placeId: a.destPlaceId, searchedAt: t });
+      }
       return trip;
     },
 
@@ -424,6 +461,23 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       return { trip, pointsAwarded: awarded, points: profile(u).points, held };
     },
 
+    delete_my_account() {
+      const u = requireUser();
+      // Như SQL: tài khoản quản lý doanh nghiệp / quản trị phải liên hệ Frego (tránh mồ côi doanh nghiệp).
+      if (profile(u).adminRole || data.business_members.some((m) => m.userId === u)) {
+        throw new Error('Tài khoản đang quản lý doanh nghiệp hoặc quản trị: liên hệ Frego để xóa');
+      }
+      // Như "on delete cascade" từ profiles: xóa mọi dòng có userId của người này.
+      for (const rows of Object.values(data) as unknown[][]) {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const r = rows[i] as { userId?: string };
+          if (r && typeof r === 'object' && r.userId === u) rows.splice(i, 1);
+        }
+      }
+      data.profiles = data.profiles.filter((p) => p.id !== u);
+      userId = null;
+      return { deleted: true as const };
+    },
     redeem_reward({ rewardId }) {
       const u = requireUser();
       const reward = find('rewards', rewardId);
@@ -542,6 +596,26 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       return { balance: b.walletBalance };
     },
 
+    // Giống SQL payos_credit_topup (supabase/migrations/20261127001000_web_fixes.sql).
+    payos_credit_topup({ orderCode, amount, reference }) {
+      const tx = data.wallet_transactions.find((x) => x.kind === 'topup' && x.orderCode === orderCode);
+      if (!tx) return { credited: false, balance: null, reason: 'not_found' };
+      const b = find('businesses', tx.businessId)!;
+      if (tx.status === 'done') return { credited: false, balance: b.walletBalance, reason: 'already' };
+      if (tx.amount !== amount) return { credited: false, balance: b.walletBalance, reason: 'amount_mismatch' };
+      tx.status = 'done';
+      if (reference) tx.note = `Nạp qua PayOS · mã giao dịch ${reference}`;
+      b.walletBalance += tx.amount;
+      data.audit_logs.push({
+        id: uid(),
+        actorName: 'PayOS',
+        actorRole: 'system',
+        action: `Tự khớp nạp tiền ${formatVnd(tx.amount)} qua PayOS, ${b.name}`,
+        createdAt: now().toISOString(),
+      });
+      return { credited: true, balance: b.walletBalance, reason: 'ok' };
+    },
+
     register_business(a) {
       const u = requireUser();
       const t = now().toISOString();
@@ -638,7 +712,148 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       });
       return { points: profile(target).points };
     },
+
+    // Giống SQL record_ad_view (supabase/migrations/20261127000800_ad_banners.sql).
+    record_ad_view({ tripId }) {
+      const u = requireUser();
+      const trip = tripOf(tripId, u);
+      if (trip.adViewedAt) return { counted: false, campaignId: null };
+      const code = trip.attached.find((c) => c.service === trip.chosenService && c.source === 'sponsor');
+      if (!code) return { counted: false, campaignId: null };
+      const campaignId = code.refId.startsWith('uv:')
+        ? (find('user_vouchers', code.refId.slice(3))?.campaignId ?? null)
+        : code.refId.startsWith('cp:')
+          ? code.refId.slice(3)
+          : null;
+      const camp = campaignId ? find('campaigns', campaignId) : null;
+      if (!camp) return { counted: false, campaignId: null };
+      camp.adViewCount = (camp.adViewCount ?? 0) + 1;
+      trip.adViewedAt = now().toISOString();
+      return { counted: true, campaignId: camp.id };
+    },
+
+    // Giống SQL record_receipt (supabase/migrations/20261127001100_gmail_receipts.sql).
+    record_receipt(a) {
+      const u = a.userId ?? requireUser();
+      data.gmail_receipts ??= [];
+      data.gmail_connections ??= [];
+      const prev = data.gmail_receipts.find((r) => r.userId === u && r.messageId === a.messageId);
+      if (prev) return { status: prev.status, duplicate: true, tripId: prev.tripId, pointsAwarded: 0, held: prev.held };
+      if (!data.gmail_connections.some((c) => c.userId === u)) throw new Error('Chưa liên kết Gmail');
+      if (!(a.paidAmount > 0) || a.paidAmount > 5_000_000) throw new Error('Số tiền không hợp lệ');
+      if (profile(u).status === 'locked') throw new Error('Tài khoản đang tạm khóa');
+      const at = new Date(a.tripAt ?? a.receivedAt).getTime();
+      if (Number.isNaN(at)) throw new Error('Thời gian không hợp lệ');
+
+      // Chuyến cùng hãng, mở app hãng trong 3 giờ trước biên nhận (cho lệch đồng hồ 15 phút), mới nhất trước.
+      const candidates = data.trips
+        .filter((t) => {
+          if (t.userId !== u || !t.chosenService || !t.openedAt) return false;
+          if (parseServiceKey(t.chosenService).providerId !== a.providerId) return false;
+          const o = new Date(t.openedAt).getTime();
+          return o >= at - RECEIPT_MATCH_WINDOW_MS && o <= at + RECEIPT_CLOCK_SKEW_MS;
+        })
+        .sort((x, y) => (x.openedAt! < y.openedAt! ? 1 : -1));
+      const trip = candidates.find((t) => t.paidAmount === null) ?? null;
+
+      let status: 'matched' | 'unmatched' | 'already_reported' = 'unmatched';
+      let tripId: string | null = null;
+      let awarded = 0;
+      let held: string | null = null;
+      const t = now().toISOString();
+      if (trip) {
+        status = 'matched';
+        tripId = trip.id;
+        const svc = SERVICES[trip.chosenService!];
+        const noData = !data.fare_tables.some(
+          (f) => f.providerId === svc.providerId && f.vehicleClass === svc.vehicleClass && f.enabled,
+        );
+        const mult = noData ? POINTS_RULES.noDataMultiplier : 1;
+        const dayOf = (iso: string) => Math.floor((new Date(iso).getTime() + 7 * 3600_000) / 86_400_000);
+        const usedToday = data.points_ledger
+          .filter((e) => e.userId === u && e.tripId && e.delta > 0 && dayOf(e.createdAt) === dayOf(t))
+          .reduce((sum, e) => sum + e.delta, 0);
+        const paid = a.paidAmount;
+        trip.paidAmount = paid;
+        trip.reportSource = 'receipt';
+        const lo = trip.estimateLow;
+        const hi = trip.estimateHigh;
+        if (!trip.verdict && lo !== null && hi !== null) {
+          trip.verdict = paid < lo ? 'cheaper' : paid > hi ? 'pricier' : 'within';
+        }
+        const tooFar =
+          lo !== null && hi !== null &&
+          (paid < lo * (1 - POINTS_RULES.maxDeviation) || paid > hi * (1 + POINTS_RULES.maxDeviation));
+        if (tooFar) {
+          held = 'Số tiền lệch hơn 30% so với ước tính nên chưa cộng điểm. Frego sẽ kiểm tra lại.';
+        } else {
+          const pts = POINTS_RULES.receipt * mult;
+          const give = Math.max(0, Math.min(pts, POINTS_RULES.dailyCap - usedToday));
+          if (give < pts) held = `Đã đạt giới hạn ${POINTS_RULES.dailyCap} điểm hôm nay, phần còn lại được giữ để kiểm tra.`;
+          if (give > 0) {
+            ledger(u, give, `Biên nhận email chuyến ${PROVIDERS[svc.providerId].name}, trả ${formatVnd(paid)}`, trip.id);
+            awarded = give;
+          }
+        }
+        trip.status = 'reported';
+        trip.reportedAt = t;
+        trip.pointsAwarded += awarded;
+      } else if (candidates[0]) {
+        status = 'already_reported';
+        tripId = candidates[0].id;
+      }
+
+      data.gmail_receipts.push({
+        id: uid(),
+        userId: u,
+        messageId: a.messageId,
+        providerId: a.providerId,
+        paidAmount: a.paidAmount,
+        receivedAt: new Date(a.receivedAt).toISOString(),
+        tripAt: a.tripAt ?? null,
+        pickup: a.pickup ?? null,
+        dropoff: a.dropoff ?? null,
+        promoCode: a.promoCode ?? null,
+        tripId,
+        status,
+        pointsAwarded: awarded,
+        held,
+        createdAt: t,
+      });
+      return { status, duplicate: false, tripId, pointsAwarded: awarded, held };
+    },
   };
 
   return db;
 }
+
+/** Mã hóa base64 không cần Buffer (chạy được cả Node, trình duyệt, Hermes). */
+function toBase64(bytes: Uint8Array): string {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i]!;
+    const b = bytes[i + 1];
+    const c = bytes[i + 2];
+    out += abc[a >> 2]! + abc[((a & 3) << 4) | ((b ?? 0) >> 4)]!;
+    out += b === undefined ? '=' : abc[((b & 15) << 2) | ((c ?? 0) >> 6)]!;
+    out += c === undefined ? '=' : abc[c & 63]!;
+  }
+  return out;
+}
+
+/** DEMO: ảnh lưu thẳng dạng data URL; "công khai" và "riêng" là một. */
+export const memoryFiles: FileStore = {
+  async uploadPrivate(_businessId, file) {
+    return `data:${file.contentType};base64,${toBase64(file.bytes)}`;
+  },
+  async viewUrl(ref) {
+    return ref;
+  },
+  async publish(ref) {
+    return ref;
+  },
+  async uploadLogo(_businessId, file) {
+    return `data:${file.contentType};base64,${toBase64(file.bytes)}`;
+  },
+};

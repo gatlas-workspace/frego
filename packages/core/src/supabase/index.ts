@@ -3,7 +3,7 @@
  * (supabase/migrations/*_rls.sql). Lệnh tin cậy gọi hàm SQL security definer.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Db, ListOptions, RpcName, Rpcs } from '../db/types';
+import type { Db, FileStore, ListOptions, RpcName, Rpcs } from '../db/types';
 import { PRIMARY_KEYS, type Row, type TableName } from '../db/schema';
 import { snakeKey, toCamel, toSnake } from './case';
 
@@ -23,9 +23,48 @@ export function createSupabaseDb(client: SupabaseClient, opts: SupabaseDbOptions
     if (error) throw new Error(`${table}: ${error.message}`);
   };
 
+  /**
+   * Kho ảnh banner: bucket riêng `ad-uploads/<businessId>/…` (chủ quán tải, quản trị xem; RLS ở migration
+   * 20261127000800_ad_banners.sql) → khi duyệt chép sang bucket công khai `ad-banners`.
+   * ref ảnh riêng có dạng `storage:ad-uploads/<đường dẫn>`.
+   */
+  const PRIVATE = 'ad-uploads';
+  const PUBLIC = 'ad-banners';
+  /** Logo quán: công khai, chủ quán tải thẳng (không cần duyệt, như cột logo_url). */
+  const LOGOS = 'business-logos';
+  const PREFIX = `storage:${PRIVATE}/`;
+  const files: FileStore = {
+    async uploadPrivate(businessId, file) {
+      const path = `${businessId}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${file.ext}`;
+      const { error } = await client.storage.from(PRIVATE).upload(path, file.bytes, { contentType: file.contentType, upsert: false });
+      fail('storage', error);
+      return PREFIX + path;
+    },
+    async viewUrl(ref) {
+      if (!ref.startsWith(PREFIX)) return ref;
+      const { data, error } = await client.storage.from(PRIVATE).createSignedUrl(ref.slice(PREFIX.length), 3600);
+      fail('storage', error);
+      return data!.signedUrl;
+    },
+    async publish(ref) {
+      if (!ref.startsWith(PREFIX)) return ref;
+      const path = ref.slice(PREFIX.length);
+      const { error } = await client.storage.from(PRIVATE).copy(path, path, { destinationBucket: PUBLIC });
+      fail('storage', error);
+      return client.storage.from(PUBLIC).getPublicUrl(path).data.publicUrl;
+    },
+    async uploadLogo(businessId, file) {
+      const path = `${businessId}/logo-${Date.now().toString(36)}.${file.ext}`;
+      const { error } = await client.storage.from(LOGOS).upload(path, file.bytes, { contentType: file.contentType, upsert: false });
+      fail('storage', error);
+      return client.storage.from(LOGOS).getPublicUrl(path).data.publicUrl;
+    },
+  };
+
   const db = {
     mode: 'supabase' as const,
     client,
+    files,
     async refreshUser() {
       const { data } = await client.auth.getUser();
       userId = data.user?.id ?? null;

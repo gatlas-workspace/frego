@@ -10,8 +10,9 @@ function sizeText(bytes: number): string {
 }
 
 /**
- * Dòng chọn tệp (giấy tờ, ảnh mặt tiền, logo). Chưa có kho tệp nên chỉ ghi nhận tên tệp đã chọn ở trình duyệt;
- * trạng thái "Đã chọn" báo cho form cha qua onPick. Ô chọn tệp không có name nên tệp không bị gửi kèm form.
+ * Dòng chọn tệp (giấy tờ, ảnh mặt tiền, logo). Mặc định chỉ ghi nhận tên tệp đã chọn ở trình duyệt (giấy tờ, ảnh mặt
+ * tiền chưa có kho tệp); trạng thái "Đã chọn" báo cho form cha qua onPick. Có `inputName` (+ `form`) thì tệp được gửi
+ * kèm form (logo ở Hồ sơ cửa hàng); `onFile` trả tệp để hiện xem trước.
  */
 export function FilePick({
   name,
@@ -21,9 +22,17 @@ export function FilePick({
   accept,
   buttonLabel,
   onPick,
+  onFile,
+  inputName,
+  form,
   disabled,
   framed = true,
 }: {
+  /** Tên trường khi gửi kèm form (không có: tệp không được gửi). */
+  inputName?: string;
+  /** id form khi ô chọn tệp nằm ngoài thẻ <form> */
+  form?: string;
+  onFile?: (file: File | null) => void;
   name: ReactNode;
   meta: ReactNode;
   icon?: AnyIconName;
@@ -47,11 +56,14 @@ export function FilePick({
         type="file"
         accept={accept}
         disabled={disabled}
+        name={inputName}
+        form={form}
         className="peer sr-only"
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           setFile(f ? { name: f.name, size: f.size } : null);
           onPick?.(!!f);
+          onFile?.(f ?? null);
         }}
       />
       <label

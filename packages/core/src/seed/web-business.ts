@@ -32,6 +32,7 @@ export const businessSeed: Partial<Seed> = {
       spent: 1677000,
       issuedCount: 410,
       usedCount: 129,
+      adViewCount: 0,
       startsAt: vn('2026-10-01 00:00'),
       endsAt: vn('2026-10-31 23:59'),
       imageUrl: null,
@@ -60,10 +61,11 @@ export const businessSeed: Partial<Seed> = {
   wallet_transactions: [
     { id: 'wt-1', businessId: BIZ, kind: 'deduction', amount: -437000, note: 'Mã được dùng ngày 21/11 · 19 mã Grab ô tô', status: 'done', reference: null, createdAt: vn('2026-11-22 00:05') },
     // Lần "Tôi đã chuyển khoản" còn chờ Frego khớp tiền (Quản trị · Tiền và đối soát).
-    { id: 'wt-2', businessId: BIZ, kind: 'topup', amount: 5000000, note: 'Nạp chuyển khoản', status: 'pending', reference: 'FREGO CPM1024', createdAt: vn('2026-11-21 16:20') },
+    { id: 'wt-2', businessId: BIZ, kind: 'topup', amount: 5000000, note: 'Nạp chuyển khoản', status: 'pending', reference: 'FREGO CPM1024-2', createdAt: vn('2026-11-21 16:20') },
     { id: 'wt-3', businessId: BIZ, kind: 'deduction', amount: -299000, note: 'Mã được dùng ngày 20/11 · 13 mã Grab ô tô', status: 'done', reference: null, createdAt: vn('2026-11-21 00:05') },
     { id: 'wt-4', businessId: BIZ, kind: 'deduction', amount: -253000, note: 'Mã được dùng ngày 19/11 · 11 mã Grab ô tô', status: 'done', reference: null, createdAt: vn('2026-11-20 00:05') },
-    { id: 'wt-5', businessId: BIZ, kind: 'topup', amount: 2000000, note: 'Tự nạp tiền · Số dư xuống dưới 500.000đ', status: 'done', reference: 'Thẻ đã lưu', createdAt: vn('2026-11-19 00:06') },
+    // Nạp chuyển khoản (đã khớp). Mỗi lần nạp một nội dung riêng: FREGO CPM1024-1, -2…
+    { id: 'wt-5', businessId: BIZ, kind: 'topup', amount: 2000000, note: 'Nạp chuyển khoản', status: 'done', reference: 'FREGO CPM1024-1', createdAt: vn('2026-11-19 08:06') },
     { id: 'wt-6', businessId: BIZ, kind: 'deduction', amount: -276000, note: 'Mã được dùng ngày 18/11 · 12 mã Grab ô tô', status: 'done', reference: null, createdAt: vn('2026-11-19 00:05') },
   ],
   invoices: [

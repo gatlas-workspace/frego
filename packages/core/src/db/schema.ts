@@ -3,6 +3,8 @@
  * Thêm bảng mới: thêm vào Tables + PRIMARY_KEYS, viết migration trong supabase/migrations.
  */
 import type {
+  AdBanner,
+  AdBannerPublic,
   AppNotification,
   AuditLog,
   Broadcast,
@@ -29,10 +31,12 @@ import type {
   Reward,
   SavedPlace,
   SupportTicket,
+  TicketMessage,
   Trip,
   UserVoucher,
   WalletTransaction,
 } from '../types';
+import type { GmailConnection, GmailReceipt } from '../receipts';
 
 /** Số liệu tổng hợp (job hằng đêm gộp từ redemptions, trips…). Doanh nghiệp chỉ thấy số liệu tổng. */
 export interface StatRow {
@@ -75,13 +79,23 @@ export interface Tables {
   invoices: Invoice;
   redemptions: Redemption;
   support_tickets: SupportTicket;
+  ticket_messages: TicketMessage;
   audit_logs: AuditLog;
   broadcasts: Broadcast;
   stats: StatRow;
+  ad_banners: AdBanner;
+  /** Kết nối Gmail. Supabase: người dùng KHÔNG đọc trực tiếp (có cột token mã hóa) — đọc qua view gmail_connections_public. */
+  gmail_connections: GmailConnection;
+  /** Biên nhận email đã ghi (chỉ RPC record_receipt ghi) */
+  gmail_receipts: GmailReceipt;
   /** View chỉ đọc: thông tin quán công khai */
   businesses_public: BusinessPublic;
   /** View chỉ đọc: chiến dịch công khai (không có ngân sách) */
   campaigns_public: CampaignPublic;
+  /** View chỉ đọc: banner quảng cáo đã duyệt mới nhất mỗi quán */
+  ad_banners_public: AdBannerPublic;
+  /** View chỉ đọc: kết nối Gmail của chính người đang đăng nhập (không có token) */
+  gmail_connections_public: GmailConnection;
 }
 
 export type TableName = keyof Tables;
@@ -113,13 +127,22 @@ export const PRIMARY_KEYS: { [K in TableName]: keyof Tables[K] & string } = {
   invoices: 'id',
   redemptions: 'id',
   support_tickets: 'id',
+  ticket_messages: 'id',
   audit_logs: 'id',
   broadcasts: 'id',
   stats: 'id',
+  ad_banners: 'id',
+  gmail_connections: 'userId',
+  gmail_receipts: 'id',
   businesses_public: 'id',
   campaigns_public: 'id',
+  ad_banners_public: 'id',
+  gmail_connections_public: 'userId',
 };
 
 /** Bảng thật (không gồm view). */
-export type BaseTableName = Exclude<TableName, 'businesses_public' | 'campaigns_public'>;
+export type BaseTableName = Exclude<
+  TableName,
+  'businesses_public' | 'campaigns_public' | 'ad_banners_public' | 'gmail_connections_public'
+>;
 export type Seed = { [K in BaseTableName]: Tables[K][] };

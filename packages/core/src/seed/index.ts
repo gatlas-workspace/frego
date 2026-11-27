@@ -37,9 +37,13 @@ const empty = (): Seed => ({
   invoices: [],
   redemptions: [],
   support_tickets: [],
+  ticket_messages: [],
   audit_logs: [],
   broadcasts: [],
   stats: [],
+  ad_banners: [],
+  gmail_connections: [],
+  gmail_receipts: [],
 });
 
 /** Seed đầy đủ (bản sao mới mỗi lần gọi). */
@@ -71,6 +75,7 @@ export function createSeed(): Seed {
     trips: base.trips,
     points_ledger: base.pointsLedger,
     notifications: base.notifications,
+    ad_banners: base.adBanners,
   });
   add(businessSeed);
   add(adminSeed);

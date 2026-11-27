@@ -157,8 +157,8 @@ export interface InvoiceRowView {
 export interface MoneyView {
   stats: { walletHeld: OpsStat; deducted: OpsStat; serviceFee: OpsStat; pendingTopups: OpsStat };
   topups: TopupRowView[];
-  /** Nạp tiền đang chờ khớp, theo thứ tự trong bảng. */
-  pendingTopups: { id: string; businessName: string; amountText: string }[];
+  /** Nạp tiền đang chờ khớp, theo thứ tự trong bảng (mỗi dòng có nút "Khớp …" riêng). */
+  pendingTopups: { id: string; businessName: string; amountText: string; reference: string; timeText: string }[];
   deductions: {
     /** "22/11": ngày chạy trừ ví gần nhất */
     runDayText: string;
@@ -372,9 +372,21 @@ export interface TicketRowView {
   label: OpsLabel;
 }
 
+export interface TicketMessageView {
+  id: string;
+  author: string;
+  /** "Người dùng", "Doanh nghiệp", "Frego" */
+  kindText: string;
+  fromFrego: boolean;
+  timeText: string;
+  body: string;
+}
+
 export interface TicketDetailView extends TicketRowView {
   createdText: string;
   dueText: string | null;
+  /** Lời người gửi và các trả lời, cũ trước mới sau. */
+  messages: TicketMessageView[];
 }
 
 export interface SupportView {
@@ -387,6 +399,20 @@ export interface SupportView {
 }
 
 /* ───────────────────────── Hàm trợ giúp ───────────────────────── */
+
+/**
+ * Điểm cộng trong tháng từ số lượt áp dụng từng quy tắc (stats points_rule_uses): tap × 10 + amount × 50 + receipt × 50,
+ * cộng "nodata_bonus" (phần điểm thêm khi nhân đôi ở nơi chưa có ước tính). null khi chưa có số lượt.
+ */
+export function pointsFromRuleUses(uses: Map<string, number>): number | null {
+  if (!uses.has('tap') && !uses.has('amount') && !uses.has('receipt')) return null;
+  return (
+    (uses.get('tap') ?? 0) * POINTS_RULES.tap +
+    (uses.get('amount') ?? 0) * POINTS_RULES.amount +
+    (uses.get('receipt') ?? 0) * POINTS_RULES.receipt +
+    (uses.get('nodata_bonus') ?? 0)
+  );
+}
 
 const DAY_MS = 86_400_000;
 const VN_OFFSET_MS = 7 * 3_600_000;
@@ -756,7 +782,14 @@ export function createAdminOpsService(db: Db) {
           pendingTopups: stat('Nạp tiền chờ khớp', formatVnd(pendingSum), 'chuyển khoản chưa vào ví'),
         },
         topups,
-        pendingTopups: pending.map((t) => ({ id: t.id, businessName: nameOf(t.businessId), amountText: formatVnd(t.amount) })),
+        pendingTopups: pending.map((t) => ({
+          id: t.id,
+          businessName: nameOf(t.businessId),
+          amountText: formatVnd(t.amount),
+          // Nạp qua PayOS: webhook tự khớp; chỉ khớp tay khi PayOS đã báo có tiền mà webhook lỗi.
+          reference: t.orderCode ? `PayOS · đơn ${t.orderCode}` : (t.reference ?? '—'),
+          timeText: `${formatDayMonth(t.createdAt)} ${formatTime(t.createdAt)}`,
+        })),
         deductions: {
           runDayText: formatDayMonth(vnDayStart(runDay)),
           usedDayText: formatDayMonth(vnDayStart(runDay - 1)),
@@ -793,12 +826,16 @@ export function createAdminOpsService(db: Db) {
         platformStats([cur, prev]),
       ]);
 
-      // Điểm cộng tháng này: số tổng hợp; chưa có thì cộng sổ điểm (đọc được với quyền quản trị).
-      let awarded = st.one('points_awarded', cur);
+      // Điểm cộng tháng này: tính từ CÙNG số liệu với bảng quy tắc (lượt áp dụng × điểm, cộng phần nhân đôi), để hai nơi
+      // luôn khớp. Chưa có số lượt theo quy tắc thì dùng số tổng hợp, rồi tới sổ điểm (đọc được với quyền quản trị).
+      const uses = st.byKey('points_rule_uses', cur);
+      const usesPrev = st.byKey('points_rule_uses', prev);
+      let awarded = pointsFromRuleUses(uses) ?? st.one('points_awarded', cur);
       if (awarded === null) {
         const ledger = await db.list('points_ledger');
         awarded = ledger.filter((e) => e.delta > 0 && monthKey(e.createdAt) === cur).reduce((s, e) => s + e.delta, 0);
       }
+      const awardedPrev = pointsFromRuleUses(usesPrev) ?? st.one('points_awarded', prev);
       const reports = st.one('price_reports', cur);
       const redeemedByReward = st.byKey('reward_redeemed', cur);
       const redeemedCount = rewards.reduce((s, r) => s + (redeemedByReward.get(r.id) ?? 0), 0);
@@ -811,7 +848,6 @@ export function createAdminOpsService(db: Db) {
       const budget = st.one('frego_code_budget', cur);
       const welcome = codes.find((c) => c.kind === 'welcome' && c.active);
 
-      const uses = st.byKey('points_rule_uses', cur);
       const usesText = (k: string, unit = '') => (uses.has(k) ? `${formatNumber(uses.get(k)!)}${unit}` : '—');
       const on: OpsLabel = { text: 'Đang bật', tone: 'green' };
       const gmail = partners.find((p) => p.kind === 'email')?.name ?? 'Gmail';
@@ -891,8 +927,8 @@ export function createAdminOpsService(db: Db) {
           awarded: stat(
             'Điểm cộng tháng này',
             formatNumber(awarded),
-            reports !== null ? `từ ${formatNumber(reports)} báo giá` : 'từ báo giá của người dùng',
-            deltaOf(awarded, st.one('points_awarded', prev)),
+            reports !== null ? `từ ${formatNumber(reports)} báo giá, theo bảng quy tắc bên dưới` : 'từ báo giá của người dùng',
+            deltaOf(awarded, awardedPrev),
           ),
           redeemed: stat('Điểm đã đổi', formatNumber(redeemedPoints), `${formatNumber(redeemedCount)} voucher đổi điểm`),
           codesUsed: stat('Mã Frego đã dùng', formatNumber(used), welcome ? `${welcome.code} và voucher đổi điểm` : 'voucher đổi điểm'),
@@ -1326,9 +1362,38 @@ export function createAdminOpsService(db: Db) {
       const shown = tickets.filter((t) => filter === 'all' || (filter === 'done' ? isDone(t) : !isDone(t)));
 
       const sel = selectedId ? tickets.find((t) => t.id === selectedId) : undefined;
-      const selected: TicketDetailView | null = sel
-        ? { ...ticketRow(sel, now), createdText: formatDateTime(sel.createdAt), dueText: sel.dueAt ? formatDate(sel.dueAt) : null }
-        : null;
+      let selected: TicketDetailView | null = null;
+      if (sel) {
+        const msgs = (await db.list('ticket_messages', { where: { ticketId: sel.id } })).sort((a, b) =>
+          a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0,
+        );
+        const requesterKind = sel.requesterKind === 'business' ? 'Doanh nghiệp' : 'Người dùng';
+        const messages: TicketMessageView[] = msgs.map((m) => ({
+          id: m.id,
+          author: m.authorName,
+          kindText: m.authorKind === 'admin' ? 'Frego' : requesterKind,
+          fromFrego: m.authorKind === 'admin',
+          timeText: formatDateTime(m.createdAt),
+          body: m.body,
+        }));
+        // Yêu cầu cũ chưa có tin nhắn: hiện tiêu đề làm lời người gửi.
+        if (!messages.some((m) => !m.fromFrego)) {
+          messages.unshift({
+            id: `${sel.id}-subject`,
+            author: sel.requesterName,
+            kindText: requesterKind,
+            fromFrego: false,
+            timeText: formatDateTime(sel.createdAt),
+            body: sel.subject,
+          });
+        }
+        selected = {
+          ...ticketRow(sel, now),
+          createdText: formatDateTime(sel.createdAt),
+          dueText: sel.dueAt ? formatDate(sel.dueAt) : null,
+          messages,
+        };
+      }
 
       // Nhật ký hôm nay (giờ VN), bỏ dòng trùng hệt nhau.
       const today = vnDay(now);
@@ -1352,6 +1417,40 @@ export function createAdminOpsService(db: Db) {
       }));
 
       return { filter, counts, rows: shown.map((t) => ticketRow(t, now)), selected, log, roles };
+    },
+
+    /**
+     * Trả lời yêu cầu hỗ trợ: lưu tin nhắn (bảng ticket_messages, người gửi đọc được trong app), yêu cầu mới chuyển
+     * sang "Đang xử lý". Ghi nhật ký.
+     */
+    async replyTicket(id: string, body: string): Promise<{ message: string }> {
+      const text = body.trim();
+      if (!text) throw new Error('Nhập nội dung trả lời.');
+      if (text.length > 2000) throw new Error('Trả lời tối đa 2.000 ký tự.');
+      const t = await db.get('support_tickets', id);
+      if (!t) throw new Error('Không tìm thấy yêu cầu.');
+      const a = await actor();
+      await db.insert('ticket_messages', {
+        ticketId: id,
+        authorKind: 'admin',
+        authorName: /Frego$/.test(a.actorName) ? a.actorName : `${a.actorName} Frego`,
+        body: text,
+        createdAt: nowIso(),
+      });
+      if (t.status === 'open') await db.update('support_tickets', id, { status: 'pending' });
+      await log(`Trả lời yêu cầu ${ticketNumber(t)} của ${t.requesterName}`);
+      return { message: `Đã gửi trả lời cho ${t.requesterName}.` };
+    },
+
+    /** Hủy tin ưu đãi đã hẹn (chưa gửi): chuyển về bản nháp, trả lại suất trong tuần. */
+    async cancelBroadcast(id: string): Promise<{ message: string }> {
+      const b = await db.get('broadcasts', id);
+      if (!b) throw new Error('Không tìm thấy tin.');
+      if (b.status !== 'scheduled') throw new Error('Chỉ hủy được tin đang hẹn gửi.');
+      if (new Date(b.scheduledAt).getTime() <= db.now().getTime()) throw new Error('Tin đã tới giờ gửi, không hủy được.');
+      await db.update('broadcasts', id, { status: 'draft', recipients: 0 });
+      await log(`Hủy hẹn gửi tin ưu đãi chung "${b.title}"`);
+      return { message: `Đã hủy hẹn gửi "${b.title}". Tin chuyển về bản nháp.` };
     },
 
     /** Đổi trạng thái yêu cầu hỗ trợ (nhận xử lý, xong, mở lại). Ghi nhật ký. */

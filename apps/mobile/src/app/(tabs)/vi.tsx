@@ -1,26 +1,29 @@
-// 5 · Ví voucher (thiết kế ViVoucher-v2.dc.html): ba tab Tặng bạn / Mã công khai / Đã dùng, mở sẵn Mã công khai.
+// 5 · Ví voucher (thiết kế ViVoucher-v2.dc.html): tab Tặng bạn / Tại quán / Mã công khai / Đã dùng, mở sẵn Mã công khai.
+// Tại quán (27/11/2026): ưu đãi trên banner quán tài trợ đã xem trong ngày, mở lại để đưa nhân viên.
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Linking, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PROVIDER_ORDER, PROVIDERS, type WalletView } from '@frego/core';
-import { CodeCard, ListCard, ListRow, Pill, T, Tabs, VoucherTicket, type TabItem } from '@/components/ui';
+import { PROVIDER_ORDER, PROVIDERS, type ShopOfferView, type WalletView } from '@frego/core';
+import { Button, Card, CodeCard, ListCard, ListRow, Pill, T, Tabs, VoucherTicket, type TabItem } from '@/components/ui';
+import { BannerImage } from '@/components/screens/flow/BannerImage';
 import { EmptyCard, ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
 import { TextLink } from '@/components/screens/wallet/TextLink';
 import { useGiftPush } from '@/components/screens/wallet/useGiftPush';
 import { useApi } from '@/lib/api';
 import { colors, layout } from '@/theme/tokens';
 
-type WalletTab = 'gift' | 'public' | 'used';
+type WalletTab = 'gift' | 'shop' | 'public' | 'used';
 
 const TABS: TabItem<WalletTab>[] = [
   { key: 'gift', label: 'Tặng bạn' },
+  { key: 'shop', label: 'Tại quán' },
   { key: 'public', label: 'Mã công khai' },
   { key: 'used', label: 'Đã dùng' },
 ];
 
-const isTab = (v: unknown): v is WalletTab => v === 'gift' || v === 'public' || v === 'used';
+const isTab = (v: unknown): v is WalletTab => v === 'gift' || v === 'shop' || v === 'public' || v === 'used';
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
@@ -29,6 +32,7 @@ export default function WalletScreen() {
   const [tab, setTab] = useState<WalletTab>(isTab(params.tab) ? params.tab : 'public');
   const [fit, setFit] = useState(false);
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: () => svc.getWallet() });
+  const shop = useQuery({ queryKey: ['shopOffers'], queryFn: () => svc.shopOffers(), enabled: tab === 'shop' });
   useGiftPush();
 
   // Mở Ví từ nơi khác với ?tab=gift (VD sau khi đổi điểm) → chuyển đúng tab.
@@ -63,6 +67,14 @@ export default function WalletScreen() {
         <PublicTab data={wallet.data} fit={fit} onToggleFit={() => setFit((v) => !v)} />
       ) : tab === 'gift' ? (
         <GiftTab data={wallet.data} />
+      ) : tab === 'shop' ? (
+        shop.isPending ? (
+          <LoadingState label="Đang tải ưu đãi tại quán" />
+        ) : shop.isError ? (
+          <ErrorState onRetry={() => shop.refetch()} />
+        ) : (
+          <ShopTab offers={shop.data} />
+        )
       ) : (
         <UsedTab data={wallet.data} />
       )}
@@ -139,5 +151,53 @@ function UsedTab({ data }: { data: WalletView }) {
         <ListRow key={u.id} lead="none" title={u.title} sub={`${u.serviceText} · ${u.usedText}`} chip={u.amountText} />
       ))}
     </ListCard>
+  );
+}
+
+/** Ưu đãi tại quán: mở lại banner quán đã xem hôm nay để đưa nhân viên khi tới quán. */
+function ShopTab({ offers }: { offers: ShopOfferView[] }) {
+  return (
+    <View style={{ gap: 12 }}>
+      <T size={14} lineHeight={21} color={colors.ink2}>
+        Ưu đãi quán tặng kèm chuyến xe. Tới quán, mở thẻ này và đưa cho nhân viên.
+      </T>
+      {offers.length ? (
+        offers.map((o) => (
+          <Card key={o.tripId} padding={16} gap={12} accessibilityLabel={`Ưu đãi tại ${o.name}: ${o.title}`}>
+            <BannerImage uri={o.imageUrl} label={`Ảnh quảng cáo của ${o.name}: ${o.title}`} />
+            <View style={{ gap: 4 }}>
+              <T weight={800} size={18} lineHeight={24} accessibilityRole="header">
+                {o.title}
+              </T>
+              {o.body ? (
+                <T size={14} lineHeight={21} color={colors.ink2}>
+                  {o.body}
+                </T>
+              ) : null}
+            </View>
+            <View style={{ gap: 2 }}>
+              <T weight={700} size={14} lineHeight={20}>
+                {o.name}
+              </T>
+              <T size={13} lineHeight={19} color={colors.muted}>
+                {o.address}
+              </T>
+              <T size={13} lineHeight={19} color={colors.dealInk} weight={600}>
+                {o.whenText}
+              </T>
+            </View>
+            <Button
+              label="Chỉ đường tới quán"
+              variant="outline"
+              size="md"
+              icon="external"
+              onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lng}`).catch(() => {})}
+            />
+          </Card>
+        ))
+      ) : (
+        <EmptyCard text="Chưa có ưu đãi tại quán hôm nay. Khi bạn đi xe bằng mã của quán tài trợ có ưu đãi, thẻ sẽ được lưu ở đây." />
+      )}
+    </View>
   );
 }

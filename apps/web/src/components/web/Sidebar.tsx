@@ -20,6 +20,7 @@ type NavGroup = { group: string; items: NavItem[] };
 const DESIGN_ICON: Record<string, AnyIconName> = {
   tongquan: 'home',
   chiendich: 'ticket',
+  quangcao: 'camera',
   baocao: 'chart',
   vi: 'wallet',
   hoso: 'brief',

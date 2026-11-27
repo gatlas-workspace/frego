@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ADMIN_NAV, BIZ_NAV } from '@/lib/nav';
 import { cx } from './cx';
-import { WebIcon } from './WebIcon';
 
 export type Crumb = { label: string; href?: string };
 
@@ -33,15 +32,15 @@ export type TopbarProps = {
   crumbs: string | Crumb[];
   /** WebTopbar note: chữ xám bên phải, vd. "Cập nhật 10 phút trước". */
   note?: ReactNode;
-  /** Thao tác bên phải. Mặc định: "Chia sẻ", ngôi sao, dấu ba chấm chỉ để trang trí như thiết kế (aria-hidden). */
+  /** Thao tác bên phải (nút thật). */
   actions?: ReactNode;
-  /** false = ẩn cụm trang trí mặc định. */
+  /** Bỏ: cụm "Chia sẻ", ngôi sao, "…" trang trí bấm không được. Giữ prop để không vỡ chỗ gọi cũ. */
   decor?: boolean;
   className?: string;
 };
 
 /** Thanh trên cùng của trang (WebTopbar): đường dẫn, ghi chú, thao tác chung. Cao 45px, dính trên khi cuộn (màn rộng). */
-export function Topbar({ crumbs, note, actions, decor = true, className }: TopbarProps) {
+export function Topbar({ crumbs, note, actions, className }: TopbarProps) {
   const list = typeof crumbs === 'string' ? parseCrumbs(crumbs) : crumbs;
   return (
     <header
@@ -89,18 +88,7 @@ export function Topbar({ crumbs, note, actions, decor = true, className }: Topba
         </ol>
       </nav>
       {note ? <span className="whitespace-nowrap px-2 text-[14px] text-ink-2 max-[600px]:hidden">{note}</span> : null}
-      {actions ??
-        (decor ? (
-          <span aria-hidden="true" className="flex items-center gap-1 max-[600px]:hidden">
-            <span className="flex h-7 items-center rounded-ctl px-2 text-[14px] text-ink">Chia sẻ</span>
-            <span className="flex size-7 flex-none items-center justify-center rounded-ctl text-ink-2">
-              <WebIcon name="star" size={18} />
-            </span>
-            <span className="flex size-7 flex-none items-center justify-center rounded-ctl text-ink-2">
-              <WebIcon name="dots" size={18} />
-            </span>
-          </span>
-        ) : null)}
+      {actions ?? null}
     </header>
   );
 }

@@ -24,6 +24,7 @@ import {
 } from '@/components/web';
 import { adminOpsService } from '@/lib/server/data';
 import { setTicketStatusAction } from './actions';
+import { ReplyBox } from './_components/ReplyBox';
 
 export const metadata: Metadata = { title: 'Hỗ trợ và nhật ký' };
 
@@ -90,7 +91,6 @@ export default async function SupportPage({ searchParams }: { searchParams: Prom
               <Tabs
                 label="Yêu cầu hỗ trợ"
                 param="loc"
-                toolbar
                 active={filter}
                 pathname={BASE}
                 items={[
@@ -181,6 +181,25 @@ export default async function SupportPage({ searchParams }: { searchParams: Prom
           {sel.dueText && sel.status !== 'done' ? (
             <Callout tone="amber" icon="clock" text={`Phải xong trước ${sel.dueText}.`} />
           ) : null}
+          <SubHeading>Trao đổi</SubHeading>
+          <ol aria-label="Trao đổi trong yêu cầu" className="m-0 flex list-none flex-col gap-2 p-0">
+            {sel.messages.map((m) => (
+              <li
+                key={m.id}
+                className={
+                  m.fromFrego
+                    ? 'ml-6 flex flex-col gap-1 rounded-frame bg-blue-soft p-3 text-[14px] leading-normal'
+                    : 'mr-6 flex flex-col gap-1 rounded-frame border border-line p-3 text-[14px] leading-normal'
+                }
+              >
+                <span className="text-[12px] text-ink-2">
+                  <b className="font-semibold text-ink">{m.author}</b> · {m.kindText} · {m.timeText}
+                </span>
+                <span className="whitespace-pre-wrap">{m.body}</span>
+              </li>
+            ))}
+          </ol>
+          <ReplyBox key={sel.id} ticketId={sel.id} />
         </Drawer>
       ) : null}
     </>

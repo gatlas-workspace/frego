@@ -16,6 +16,7 @@ import {
   buttonClass,
 } from '@/components/web';
 import { bizService } from '@/lib/server/data';
+import { AdViewsRow } from '@/app/doanh-nghiep/_components/AdViewsRow';
 
 export const metadata: Metadata = { title: 'Báo cáo chuyến đến', robots: { index: false, follow: false } };
 
@@ -42,6 +43,7 @@ export default async function Page() {
             <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} />
           ))}
         </StatGroup>
+        <AdViewsRow stat={v.adViews} />
         <Columns template="minmax(0,2fr) minmax(0,1fr)" align="stretch">
           <Panel title="Theo giờ trong ngày" id="bc-gio" description={v.hours.peakText}>
             {v.hours.bars.length ? (
@@ -63,6 +65,7 @@ export default async function Page() {
                   valueHeader="Chuyến"
                   className="@min-[520px]:hidden"
                 />
+                {v.hours.note ? <Hint className="mt-2!">{v.hours.note}</Hint> : null}
               </>
             ) : (
               <Hint className="mt-0!">Chưa có chuyến nào trong tháng.</Hint>

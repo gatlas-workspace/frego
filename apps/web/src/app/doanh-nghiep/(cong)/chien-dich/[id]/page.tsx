@@ -19,6 +19,7 @@ import {
   Topbar,
 } from '@/components/web';
 import { bizService } from '@/lib/server/data';
+import { AdViewsRow } from '@/app/doanh-nghiep/_components/AdViewsRow';
 import { BudgetEditor } from './_components/BudgetEditor';
 import { PauseButton } from './_components/PauseButton';
 
@@ -61,11 +62,19 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <Callout tone="red" icon="x" text={`Frego từ chối, lý do: ${v.rejectReason ?? 'Frego đã gửi lý do qua email.'} Sửa rồi gửi lại để Frego duyệt.`} />
         ) : null}
         {v.status === 'draft' ? <Callout tone="grey" text="Bản nháp, chưa gửi Frego duyệt." /> : null}
+        {v.status === 'scheduled' ? (
+          <Callout
+            tone="blue"
+            icon="clock"
+            text={`${v.statusLabel}. Frego chưa tặng mã và ví chưa bị trừ tiền cho tới ngày bắt đầu.`}
+          />
+        ) : null}
         <StatGroup label="Số liệu chiến dịch">
           {v.stats.map((s) => (
             <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} />
           ))}
         </StatGroup>
+        <AdViewsRow stat={v.adViews} />
         <Columns template="minmax(0,1fr) 380px" stackBelow="lg">
           <div className="flex min-w-0 flex-col gap-5">
             <Panel title={v.chart.title} id="ct-ngay">

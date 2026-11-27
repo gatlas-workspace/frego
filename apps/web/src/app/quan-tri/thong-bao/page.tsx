@@ -1,6 +1,7 @@
 // QT 9 · Thông báo (WebQtThongBao): loại tin khớp Cài đặt thông báo của app, soạn tin ưu đãi chung có xem trước, "Hẹn gửi".
 import type { Metadata } from 'next';
 import {
+  Button,
   Callout,
   Columns,
   Divider,
@@ -20,6 +21,7 @@ import {
 import { PROMO_BROADCASTS_PER_WEEK } from '@frego/core';
 import { adminOpsService } from '@/lib/server/data';
 import { Composer } from './_components/Composer';
+import { cancelBroadcastAction } from './actions';
 
 export const metadata: Metadata = { title: 'Thông báo' };
 
@@ -68,7 +70,21 @@ export default async function NotificationsPage() {
                 <SubHeading>Tin đã hẹn</SubHeading>
                 <List label="Tin đã hẹn">
                   {v.scheduled.map((b) => (
-                    <ListRow key={b.id} icon="clock" title={b.title} sub={`${b.whenText} · ${b.recipientsText}`} padding={8} />
+                    <ListRow
+                      key={b.id}
+                      icon="clock"
+                      title={b.title}
+                      sub={`${b.whenText} · ${b.recipientsText}`}
+                      padding={8}
+                      trailing={
+                        <form action={cancelBroadcastAction}>
+                          <input type="hidden" name="id" value={b.id} />
+                          <Button type="submit" variant="ghost" size="sm" aria-label={`Hủy hẹn gửi tin ${b.title}`}>
+                            Hủy hẹn
+                          </Button>
+                        </form>
+                      }
+                    />
                   ))}
                 </List>
               </>

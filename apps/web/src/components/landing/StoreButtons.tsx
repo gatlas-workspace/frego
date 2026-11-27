@@ -2,7 +2,7 @@ import { brand } from "@frego/core";
 
 /**
  * Nút tải app và mã QR. Theo ghi chú thiết kế: nút và mã QR là MẪU, chưa có link
- * App Store / Google Play (link lấy từ `brand.web`, hiện trỏ về mục #tai-app).
+ * App Store / Google Play (link lấy từ `brand.web`). Chưa có link thật thì nút hiện "Sắp có", không bấm được.
  */
 
 type Variant = "dark" | "light" | "white" | "ghost";
@@ -36,18 +36,29 @@ function PhoneGlyph() {
 
 export function StoreButton({ platform, variant }: { platform: "ios" | "android"; variant: Variant }) {
   const href = platform === "ios" ? brand.web.appStoreUrl : brand.web.playStoreUrl;
-  return (
-    <a
-      href={href}
-      className={`flex h-[60px] items-center gap-3 rounded-app-block pl-[18px] pr-[22px] transition-colors ${VARIANT[variant]}`}
-    >
+  const name = platform === "ios" ? "Tải cho iPhone" : "Tải cho Android";
+  // Chưa có link App Store / Google Play thật (brand.web còn "#…"): hiện "Sắp có", không làm nút bấm không đi đâu.
+  const ready = /^https?:\/\//.test(href);
+  const cls = `flex h-[60px] items-center gap-3 rounded-app-block pl-[18px] pr-[22px] transition-colors ${VARIANT[variant]}`;
+  const inner = (
+    <>
       <PhoneGlyph />
       <span className="flex flex-col leading-[1.2]">
-        <span aria-hidden="true" className="text-xs font-semibold opacity-80">
-          Có trên
-        </span>
-        <span className="text-[17px] font-extrabold">{platform === "ios" ? "Tải cho iPhone" : "Tải cho Android"}</span>
+        <span className="text-xs font-semibold opacity-80">{ready ? "Có trên" : "Sắp có"}</span>
+        <span className="text-[17px] font-extrabold">{name}</span>
       </span>
+    </>
+  );
+  if (!ready) {
+    return (
+      <div className={`${cls} cursor-default`}>
+        {inner}
+      </div>
+    );
+  }
+  return (
+    <a href={href} className={cls}>
+      {inner}
     </a>
   );
 }

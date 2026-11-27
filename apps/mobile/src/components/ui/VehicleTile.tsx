@@ -1,8 +1,9 @@
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import type { ProviderId, VehicleClass } from '@frego/core';
 import { BrandLogo } from './BrandLogo';
 import { colors, radius } from '@/theme/tokens';
+import { svgHidden } from './a11y';
 
 /** Loại xe trong minh họa: xe máy, ô tô 4 chỗ, ô tô 6–7 chỗ. */
 export type VehicleKind = 'bike' | 'car' | 'suv';
@@ -40,8 +41,7 @@ export function VehicleArt({ kind, color = colors.providerOther, width = 60, hei
       width={width}
       height={h}
       viewBox="0 0 120 64"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      {...svgHidden}
       pointerEvents="none"
     >
       {kind === 'bike' ? (
@@ -62,12 +62,15 @@ export function VehicleArt({ kind, color = colors.providerOther, width = 60, hei
       ) : kind === 'car' ? (
         <>
           <Ellipse cx={62} cy={58} rx={50} ry={3.5} fill={colors.vehicleShadow} />
-          <Path
-            d="M10 42 C10 36 14 33 20 32 L32 30 L44 19 C47 16.5 50.5 15 54.5 15 L77 15 C81 15 84.5 16.5 87.5 19 L99 30 L106 31.5 C111 32.5 114 36 114 41 L114 47 C114 49.5 112 51.5 109.5 51.5 L14.5 51.5 C12 51.5 10 49.5 10 47 Z"
-            fill={color}
-          />
-          <Path d="M47.5 30 L56 20.5 C57 19.4 58.4 18.8 59.9 18.8 L64 18.8 L64 30 Z" fill={colors.vehicleGlass} />
-          <Path d="M68 18.8 L76.5 18.8 C78.4 18.8 80.2 19.6 81.4 21 L90 30 L68 30 Z" fill={colors.vehicleGlass} />
+          {/* Lật ngang quanh x = 62 để mũi xe (phần dài) ở bên phải: mọi xe cùng hướng trái → phải. */}
+          <G transform="translate(124 0) scale(-1 1)">
+            <Path
+              d="M10 42 C10 36 14 33 20 32 L32 30 L44 19 C47 16.5 50.5 15 54.5 15 L77 15 C81 15 84.5 16.5 87.5 19 L99 30 L106 31.5 C111 32.5 114 36 114 41 L114 47 C114 49.5 112 51.5 109.5 51.5 L14.5 51.5 C12 51.5 10 49.5 10 47 Z"
+              fill={color}
+            />
+            <Path d="M47.5 30 L56 20.5 C57 19.4 58.4 18.8 59.9 18.8 L64 18.8 L64 30 Z" fill={colors.vehicleGlass} />
+            <Path d="M68 18.8 L76.5 18.8 C78.4 18.8 80.2 19.6 81.4 21 L90 30 L68 30 Z" fill={colors.vehicleGlass} />
+          </G>
           <Rect x={104} y={35} width={7} height={4} rx={2} fill={colors.vehicleHeadlight} />
           <Rect x={12} y={35} width={5} height={4} rx={2} fill={colors.vehicleTaillight} />
           <Circle cx={32} cy={51} r={9.5} fill={colors.vehicleDark} />
@@ -76,21 +79,26 @@ export function VehicleArt({ kind, color = colors.providerOther, width = 60, hei
           <Circle cx={92} cy={51} r={4} fill={colors.vehicleHub} />
         </>
       ) : (
+        // Ô tô 6–7 chỗ: dáng SUV/MPV (Innova, Xpander, Fortuner) — kính trước nghiêng, mui dài, đuôi gần thẳng,
+        // 3 ô cửa sổ (ô hông nhỏ cho hàng ghế 3), thanh giá nóc, bánh to: khác hẳn sedan 4 chỗ.
         <>
-          <Ellipse cx={62} cy={58} rx={50} ry={3.5} fill={colors.vehicleShadow} />
+          <Ellipse cx={62} cy={58} rx={51} ry={3.5} fill={colors.vehicleShadow} />
+          <Rect x={24} y={9.5} width={46} height={2.6} rx={1.3} fill={colors.vehicleDark} />
+          <Rect x={28} y={11} width={2.4} height={3.5} fill={colors.vehicleDark} />
+          <Rect x={64} y={11} width={2.4} height={3.5} fill={colors.vehicleDark} />
           <Path
-            d="M10 44 C10 38 13 34 19 33 L28 31 L36 17 C38 14 41 12.5 44.5 12.5 L90 12.5 C94 12.5 97 14.5 98.5 17.5 L104 31 L107 32 C112 33.5 114 37 114 42 L114 47 C114 49.5 112 51.5 109.5 51.5 L14.5 51.5 C12 51.5 10 49.5 10 47 Z"
+            d="M10 46 L10 26 C10 20.5 12.5 16.5 17.5 15 C19.5 14.4 21.5 14.2 23.5 14.2 L73 14.2 C76 14.2 78.6 15.3 80.6 17.4 L92.5 29.5 L105 31.4 C110.6 32.3 114 36 114 41 L114 47 C114 49.5 112 51.5 109.5 51.5 L14.5 51.5 C12 51.5 10 49.5 10 47 Z"
             fill={color}
           />
-          <Path d="M39 30 L45 17 L60 17 L60 30 Z" fill={colors.vehicleGlass} />
-          <Path d="M64 17 L80 17 L80 30 L64 30 Z" fill={colors.vehicleGlass} />
-          <Path d="M84 17 L92 17 C94 17 95 18 95.8 19.5 L100 30 L84 30 Z" fill={colors.vehicleGlass} />
-          <Rect x={104} y={35} width={7} height={4} rx={2} fill={colors.vehicleHeadlight} />
-          <Rect x={12} y={35} width={5} height={4} rx={2} fill={colors.vehicleTaillight} />
-          <Circle cx={32} cy={51} r={9.5} fill={colors.vehicleDark} />
-          <Circle cx={32} cy={51} r={4} fill={colors.vehicleHub} />
-          <Circle cx={92} cy={51} r={9.5} fill={colors.vehicleDark} />
-          <Circle cx={92} cy={51} r={4} fill={colors.vehicleHub} />
+          <Path d="M15.5 28 L15.5 22.5 C15.5 20 17.3 18 19.8 18 L31 18 L31 28 Z" fill={colors.vehicleGlass} />
+          <Path d="M35 18 L53 18 L53 28 L35 28 Z" fill={colors.vehicleGlass} />
+          <Path d="M57 18 L72.5 18 C74.4 18 76.2 18.8 77.5 20.2 L85.5 28 L57 28 Z" fill={colors.vehicleGlass} />
+          <Rect x={105} y={34.5} width={7} height={4} rx={2} fill={colors.vehicleHeadlight} />
+          <Rect x={11.5} y={31} width={4} height={6} rx={2} fill={colors.vehicleTaillight} />
+          <Circle cx={31} cy={50.5} r={10.5} fill={colors.vehicleDark} />
+          <Circle cx={31} cy={50.5} r={4.5} fill={colors.vehicleHub} />
+          <Circle cx={93} cy={50.5} r={10.5} fill={colors.vehicleDark} />
+          <Circle cx={93} cy={50.5} r={4.5} fill={colors.vehicleHub} />
         </>
       )}
     </Svg>

@@ -23,6 +23,16 @@ export const brand = {
     appStoreUrl: '#tai-app',
     playStoreUrl: '#tai-app',
   },
+  /**
+   * Tài khoản nhận tiền nạp ví doanh nghiệp (chuyển khoản tay, khi chưa bật PayOS).
+   * [ĐIỀN SỐ TÀI KHOẢN]: chủ dự án điền tên ngân hàng, số tài khoản, chủ tài khoản thật trước khi ra mắt.
+   */
+  bank: {
+    bankName: '[ĐIỀN TÊN NGÂN HÀNG]',
+    accountNumber: '[ĐIỀN SỐ TÀI KHOẢN]',
+    accountName: 'CONG TY TNHH GATLAS',
+    branch: '[ĐIỀN CHI NHÁNH]',
+  },
   /** Số mẫu cần chốt (ghi chú thiết kế): phí dịch vụ mỗi mã được dùng. */
   serviceFeePerCode: 3000,
   /** Quà chào mừng khi đăng nhập lần đầu. */

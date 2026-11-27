@@ -28,6 +28,7 @@ import {
   vnParts,
 } from '../format';
 import type {
+  AdBanner,
   Business,
   BusinessMember,
   Campaign,
@@ -39,6 +40,8 @@ import type {
   VehicleClass,
   WalletTransaction,
 } from '../types';
+
+export * from './payos';
 
 /* ───────────────────────── Hằng số, nhãn ───────────────────────── */
 
@@ -66,20 +69,38 @@ export function bizServiceLabel(providerId: ProviderId, vehicleClass: VehicleCla
 }
 
 export type BizTone = 'green' | 'amber' | 'grey' | 'red' | 'blue';
-export type BizCampaignTab = 'tat-ca' | 'dang-chay' | 'cho-duyet' | 'bi-tu-choi' | 'tam-dung' | 'da-ket-thuc' | 'nhap';
+export type BizCampaignTab = 'tat-ca' | 'dang-chay' | 'sap-chay' | 'cho-duyet' | 'bi-tu-choi' | 'tam-dung' | 'da-ket-thuc' | 'nhap';
 
-const STATUS: Record<CampaignStatus, { label: string; tone: BizTone; rank: number; tab: BizCampaignTab }> = {
+/**
+ * Trạng thái hiển thị: như campaigns.status, thêm "scheduled" = đã duyệt (status active) nhưng chưa tới ngày bắt đầu.
+ * Không lưu riêng: tự thành "Đang chạy" khi tới ngày (giống cột offering của view campaigns_public).
+ */
+export type BizCampaignState = CampaignStatus | 'scheduled';
+
+/** Trạng thái hiển thị của chiến dịch tại thời điểm `now`. */
+export function bizCampaignState(c: Pick<Campaign, 'status' | 'startsAt'>, now: Date): BizCampaignState {
+  return c.status === 'active' && new Date(c.startsAt).getTime() > now.getTime() ? 'scheduled' : c.status;
+}
+
+const STATUS: Record<BizCampaignState, { label: string; tone: BizTone; rank: number; tab: BizCampaignTab }> = {
   active: { label: 'Đang chạy', tone: 'green', rank: 0, tab: 'dang-chay' },
-  paused: { label: 'Tạm dừng', tone: 'grey', rank: 1, tab: 'tam-dung' },
-  pending: { label: 'Chờ Frego duyệt', tone: 'amber', rank: 2, tab: 'cho-duyet' },
-  draft: { label: 'Nháp', tone: 'grey', rank: 3, tab: 'nhap' },
-  rejected: { label: 'Bị từ chối', tone: 'red', rank: 4, tab: 'bi-tu-choi' },
-  ended: { label: 'Đã kết thúc', tone: 'grey', rank: 5, tab: 'da-ket-thuc' },
+  scheduled: { label: 'Đã duyệt', tone: 'blue', rank: 1, tab: 'sap-chay' },
+  paused: { label: 'Tạm dừng', tone: 'grey', rank: 2, tab: 'tam-dung' },
+  pending: { label: 'Chờ Frego duyệt', tone: 'amber', rank: 3, tab: 'cho-duyet' },
+  draft: { label: 'Nháp', tone: 'grey', rank: 4, tab: 'nhap' },
+  rejected: { label: 'Bị từ chối', tone: 'red', rank: 5, tab: 'bi-tu-choi' },
+  ended: { label: 'Đã kết thúc', tone: 'grey', rank: 6, tab: 'da-ket-thuc' },
 };
+
+/** "Đã duyệt · chạy từ 01/12" cho chiến dịch chưa tới ngày; còn lại nhãn cố định. */
+function statusLabelOf(state: BizCampaignState, c: Pick<Campaign, 'startsAt'>): string {
+  return state === 'scheduled' ? `Đã duyệt · chạy từ ${formatDayMonth(c.startsAt)}` : STATUS[state].label;
+}
 
 const TABS: { key: BizCampaignTab; label: string }[] = [
   { key: 'tat-ca', label: 'Tất cả' },
   { key: 'dang-chay', label: 'Đang chạy' },
+  { key: 'sap-chay', label: 'Sắp chạy' },
   { key: 'cho-duyet', label: 'Chờ duyệt' },
   { key: 'bi-tu-choi', label: 'Bị từ chối' },
   { key: 'tam-dung', label: 'Tạm dừng' },
@@ -130,6 +151,9 @@ const MEMBER_ROLE: Record<BusinessMember['role'], { label: string; permissions: 
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/** Sự kiện chiến dịch khi quán đổi địa chỉ (cùng chữ với trigger SQL businesses_address_guard). */
+export const BIZ_EV_ADDRESS_REREVIEW = 'Quay lại chờ duyệt vì quán đổi địa chỉ';
+
 /* ───────────────────────── Kiểu dữ liệu màn hình ───────────────────────── */
 
 /** Ô số liệu (WebStatCard). */
@@ -160,7 +184,7 @@ export interface BizCampaignRowView {
   name: string;
   /** "01/11 – 30/11/2026 · 13:00–19:00", "… · dừng từ 16/11", "… · Frego từ chối 22/11" */
   sub: string;
-  status: CampaignStatus;
+  status: BizCampaignState;
   statusLabel: string;
   statusTone: BizTone;
   providerId: ProviderId;
@@ -207,10 +231,47 @@ export interface BizCampaignListView {
   canManage: boolean;
 }
 
+/* Quảng cáo (banner popup sau màn So giá) */
+
+export const AD_TITLE_MAX = 40;
+export const AD_BODY_MAX = 120;
+export const AD_IMAGE_MAX_BYTES = 1024 * 1024;
+/** contentType → đuôi file */
+export const AD_IMAGE_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+export const AD_RULES = [
+  'Ảnh JPG, PNG hoặc WebP, tối đa 1 MB, nên 1200 × 675 px (tỉ lệ 16:9).',
+  `Tiêu đề tối đa ${AD_TITLE_MAX} ký tự, nội dung tối đa ${AD_BODY_MAX} ký tự.`,
+  'Không đưa số điện thoại, mã QR, logo hãng xe hay nội dung sai sự thật.',
+  'Frego duyệt trong 1 ngày làm việc. Banner hiện khi khách chọn hãng có mã của quán ở màn So giá.',
+];
+
+export interface BizAdBannerView {
+  id: string;
+  /** URL xem được (ảnh chờ duyệt: URL có hạn) */
+  imageUrl: string;
+  title: string;
+  body: string;
+  /** "Đang hiện trong app từ 25/11/2026" / "Gửi 22/11/2026, Frego duyệt trong 1 ngày làm việc" */
+  statusText: string;
+}
+
+export interface BizAdView {
+  running: BizAdBannerView | null;
+  pending: BizAdBannerView | null;
+  rejected: (BizAdBannerView & { reason: string }) | null;
+  adViews: BizStatView;
+  canSubmit: boolean;
+  /** Lý do chưa gửi được (kế toán; đang có bản chờ duyệt) */
+  submitBlockedText: string | null;
+  /** Thông tin quán cho khung xem trước popup */
+  preview: { name: string; category: CategoryKey; industry: string; address: string; giftText: string };
+  rules: string[];
+}
+
 export interface BizCampaignDetailView {
   id: string;
   name: string;
-  status: CampaignStatus;
+  status: BizCampaignState;
   statusLabel: string;
   statusTone: BizTone;
   /** "01/11 – 30/11/2026 · 13:00–19:00 · Grab ô tô 4 chỗ · 500 m quanh quán" */
@@ -222,6 +283,8 @@ export interface BizCampaignDetailView {
   resubmitHref: string | null;
   rejectReason: string | null;
   stats: BizStatView[];
+  /** Lượt hiện popup quảng cáo của quán từ chiến dịch này (chỉ số tổng) */
+  adViews: BizStatView;
   chart: BizChartView & { title: string };
   history: { key: string; time: string; text: string }[];
   settings: { label: string; value: string }[];
@@ -303,10 +366,14 @@ export interface BizWalletView {
   balanceText: string;
   /** "Đủ cho khoảng 51 mã Grab ô tô −20.000đ. Hôm nay đã có 17 mã được dùng, sẽ trừ ngày 23/11." */
   coverText: string;
-  autoTopup: { enabled: boolean; title: string; sub: string };
   topupOptions: { value: number; label: string }[];
   defaultTopup: number;
+  /** Mã gốc của doanh nghiệp ("FREGO CPM1024"); mỗi lần nạp thêm hậu tố riêng. */
   transferCode: string;
+  /** Nội dung chuyển khoản của lần nạp kế tiếp ("FREGO CPM1024-3"). */
+  nextReference: string;
+  /** Tài khoản nhận của Frego (brand.bank). */
+  bank: { bankName: string; accountNumber: string; accountName: string; branch: string };
   transactions: BizTransactionView[];
   invoices: BizInvoiceView[];
   invoiceEmail: string;
@@ -327,12 +394,15 @@ export interface BizReportView {
   /** "Tháng 11/2026, tính đến hết 22/11. Chỉ có số liệu tổng hợp, …" */
   description: string;
   stats: BizStatView[];
-  hours: BizChartView & { peakText: string };
+  /** note: khung giờ của từng chiến dịch trong tháng (giải thích chuyến ngoài khung giờ của chiến dịch đang chạy) */
+  hours: BizChartView & { peakText: string; note: string | null };
   services: BizMeterView[];
   /** "Chiến dịch Be xe máy tạm dừng từ 16/11 nên ít chuyến hơn." */
   servicesNote: string | null;
   districts: BizMeterView[];
   weekdays: BizChartView;
+  /** Tổng lượt hiện popup quảng cáo của quán (mọi chiến dịch, từ trước tới nay) */
+  adViews: BizStatView;
   hasData: boolean;
 }
 
@@ -353,7 +423,8 @@ export interface BizProfileView {
   address: string;
   landmark: string;
   category: CategoryKey;
-  logo: { title: string; sub: string };
+  /** imageUrl: ảnh logo đã lưu (null → ô biểu tượng theo ngành) */
+  logo: { title: string; sub: string; imageUrl: string | null };
   openHours: { label: string; value: string }[];
   storefront: { title: string; statusText: string; tone: BizTone };
   invoiceName: string;
@@ -473,6 +544,33 @@ function edgeInitials(text: string): string {
   const parts = text.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return initials(text);
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/**
+ * Tên tệp ảnh để hiện ("logo-may.png"). Ảnh DEMO là data URL (không có tên tệp: trước đây lấy nhầm đuôi base64, VD "Z").
+ */
+export function imageFileName(url: string | null | undefined): string {
+  if (!url || url.startsWith('data:')) return '';
+  const last = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '');
+  return /\.[a-z0-9]{2,5}$/i.test(last) ? last : '';
+}
+
+/** Mã chuyển khoản riêng của lần nạp thứ n: "FREGO CPM1024-3". */
+export function topupReference(transferCode: string, n: number): string {
+  return `${transferCode}-${n}`;
+}
+
+/** Số thứ tự lần nạp kế tiếp theo các nội dung chuyển khoản đã dùng ("FREGO CPM1024-2" → 3). */
+export function nextTopupNumber(transferCode: string, references: (string | null)[]): number {
+  let max = 0;
+  const prefix = `${transferCode}-`;
+  for (const r of references) {
+    if (r && r.startsWith(prefix)) {
+      const n = Number(r.slice(prefix.length));
+      if (Number.isInteger(n) && n > max) max = n;
+    }
+  }
+  return max + 1;
 }
 
 /** "Mã được dùng ngày 21/11 · 19 mã Grab ô tô" → ["Mã được dùng ngày 21/11", "19 mã Grab ô tô"] */
@@ -730,6 +828,10 @@ export function createBusinessService(db: Db, businessId: string) {
       .map(({ e }) => e);
   }
 
+  const stateNow = (c: Campaign) => bizCampaignState(c, db.now());
+  /** Đang chạy thật: đã duyệt và đã tới ngày bắt đầu (không gồm chiến dịch "Đã duyệt · chạy từ …"). */
+  const isRunning = (c: Campaign) => stateNow(c) === 'active';
+
   async function canManage(): Promise<boolean> {
     const uid = db.currentUserId();
     if (!uid) return false;
@@ -739,6 +841,66 @@ export function createBusinessService(db: Db, businessId: string) {
 
   async function requireOwner() {
     if (!(await canManage())) throw new BizServiceError('Chỉ chủ cửa hàng làm được thao tác này.');
+  }
+
+  /** Ngày banner đầu tiên của quán được duyệt (lượt xem quảng cáo chỉ đếm từ đó), null khi chưa có banner duyệt. */
+  async function adSince(): Promise<string | null> {
+    const banners = await db.list('ad_banners', { where: { businessId } });
+    const dates = banners
+      .filter((a) => (a.status === 'approved' || a.status === 'replaced') && a.reviewedAt)
+      .map((a) => a.reviewedAt!)
+      .sort();
+    return dates[0] ?? null;
+  }
+
+  /**
+   * Ô "Lượt xem quảng cáo": số lần popup của quán hiện sau màn So giá (mỗi chuyến tính 1 lần), ghi rõ mốc bắt đầu đếm.
+   * Không đặt cạnh số mã đã dùng (khác khoảng thời gian: mã tính cả trước khi có banner).
+   */
+  function adViewsStat(views: number, since: string | null): BizStatView {
+    return {
+      label: 'Lượt xem quảng cáo',
+      value: formatNumber(views),
+      sub: since
+        ? `từ ${formatDate(since)} (ngày banner được duyệt), mỗi chuyến tính 1 lần`
+        : views
+          ? 'popup hiện khi khách chọn hãng có mã của quán'
+          : 'chưa có banner được duyệt',
+    };
+  }
+
+  function checkTopupAmount(amount: number) {
+    if (!Number.isInteger(amount) || amount < 100000 || amount > 500_000_000) {
+      throw new BizServiceError('Số tiền nạp từ 100.000đ đến 500.000.000đ.');
+    }
+  }
+
+  /** Ghi lần nạp chờ khớp với nội dung chuyển khoản chưa dùng (thử lại khi trùng do hai người bấm cùng lúc). */
+  async function insertTopup(amount: number, note: string, wanted: string | null, orderCode: number | null): Promise<WalletTransaction> {
+    const b = await business();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const txs = await db.list('wallet_transactions', { where: { businessId } });
+      const used = new Set(txs.map((t) => t.reference));
+      const reference =
+        attempt === 0 && wanted && wanted.startsWith(`${b.transferCode}-`) && !used.has(wanted)
+          ? wanted
+          : topupReference(b.transferCode, nextTopupNumber(b.transferCode, [...used]));
+      try {
+        return await db.insert('wallet_transactions', {
+          businessId,
+          kind: 'topup',
+          amount,
+          note,
+          status: 'pending',
+          reference,
+          ...(orderCode !== null ? { orderCode } : {}),
+          createdAt: db.now().toISOString(),
+        });
+      } catch (e) {
+        if (attempt === 2) throw e;
+      }
+    }
+    throw new BizServiceError('Chưa ghi nhận được. Thử lại sau ít phút.');
   }
 
   async function addEvent(campaignId: string, text: string) {
@@ -782,7 +944,8 @@ export function createBusinessService(db: Db, businessId: string) {
   }
 
   function rowOf(c: Campaign, events: CampaignEvent[]): BizCampaignRowView {
-    const st = STATUS[c.status];
+    const state = stateNow(c);
+    const st = STATUS[state];
     const range = dateRange(c.startsAt, c.endsAt);
     let sub = range;
     if (c.status === 'active') sub = `${range} · ${c.hoursFrom}–${c.hoursTo}`;
@@ -794,14 +957,15 @@ export function createBusinessService(db: Db, businessId: string) {
       const e = latestEvent(events, c.id, 'Frego từ chối');
       sub = e ? `${range} · Frego từ chối ${formatDayMonth(e.at)}` : range;
     }
-    const notRun = c.issuedCount === 0 && (c.status === 'pending' || c.status === 'draft' || c.status === 'rejected');
+    const notRun =
+      c.issuedCount === 0 && (c.status === 'pending' || c.status === 'draft' || c.status === 'rejected' || state === 'scheduled');
     return {
       id: c.id,
       href: `/doanh-nghiep/chien-dich/${c.id}`,
       name: c.name,
       sub,
-      status: c.status,
-      statusLabel: st.label,
+      status: state,
+      statusLabel: statusLabelOf(state, c),
       statusTone: st.tone,
       providerId: c.providerId,
       offerText: `${bizServiceLabel(c.providerId, c.vehicleClass)} · ${formatDiscount(c.amount)}`,
@@ -813,11 +977,11 @@ export function createBusinessService(db: Db, businessId: string) {
   }
 
   const byRank = (a: Campaign, b: Campaign) =>
-    STATUS[a.status].rank - STATUS[b.status].rank || b.createdAt.localeCompare(a.createdAt);
+    STATUS[stateNow(a)].rank - STATUS[stateNow(b)].rank || b.createdAt.localeCompare(a.createdAt);
 
   /** Chiến dịch đang chạy tốn nhất mỗi mã → "51 mã Grab ô tô". */
   function coverOf(balance: number, list: Campaign[]) {
-    const running = list.filter((c) => c.status === 'active').sort((a, b) => b.amount - a.amount)[0];
+    const running = list.filter(isRunning).sort((a, b) => b.amount - a.amount)[0];
     if (!running) return null;
     const per = running.amount + FEE;
     return {
@@ -902,17 +1066,20 @@ export function createBusinessService(db: Db, businessId: string) {
       const [list, manage] = await Promise.all([campaigns(), canManage()]);
       const events = await eventsOf(list.map((c) => c.id));
       const sorted = list.slice().sort(byRank);
-      const count = (k: BizCampaignTab) => (k === 'tat-ca' ? list.length : list.filter((c) => STATUS[c.status].tab === k).length);
-      const tabs = TABS.filter((t) => t.key !== 'nhap' || count('nhap') > 0).map((t) => ({ ...t, count: count(t.key) }));
+      const count = (k: BizCampaignTab) => (k === 'tat-ca' ? list.length : list.filter((c) => STATUS[stateNow(c)].tab === k).length);
+      const tabs = TABS.filter((t) => (t.key !== 'nhap' && t.key !== 'sap-chay') || count(t.key) > 0).map((t) => ({
+        ...t,
+        count: count(t.key),
+      }));
       const activeTab = (tabs.find((t) => t.key === tab)?.key ?? 'tat-ca') as BizCampaignTab;
-      const running = sorted.find((c) => c.status === 'active');
+      const running = sorted.find(isRunning);
       const rejected = list
         .filter((c) => c.status === 'rejected')
         .sort((a, b) => (b.submittedAt ?? b.createdAt).localeCompare(a.submittedAt ?? a.createdAt))[0];
       return {
         tabs,
         activeTab,
-        rows: sorted.filter((c) => activeTab === 'tat-ca' || STATUS[c.status].tab === activeTab).map((c) => rowOf(c, events)),
+        rows: sorted.filter((c) => activeTab === 'tat-ca' || STATUS[stateNow(c)].tab === activeTab).map((c) => rowOf(c, events)),
         running: running
           ? {
               id: running.id,
@@ -941,16 +1108,18 @@ export function createBusinessService(db: Db, businessId: string) {
       const lastDay = Math.min(db.now().getTime(), new Date(c.endsAt).getTime());
       const period = bizPeriodOf(Math.max(lastDay, new Date(c.startsAt).getTime()));
       const [events, daily, manage] = await Promise.all([eventsOf([c.id]), stat(`cp:${c.id}`, 'codes_used_daily', period), canManage()]);
-      const st = STATUS[c.status];
+      const state = stateNow(c);
+      const st = STATUS[state];
       const service = bizServiceLabel(c.providerId, c.vehicleClass);
       const perCode = c.amount + FEE;
       const left = Math.max(0, c.budget - c.spent);
       const notStarted = c.issuedCount === 0;
+      const adFrom = await adSince();
       return {
         id: c.id,
         name: c.name,
-        status: c.status,
-        statusLabel: st.label,
+        status: state,
+        statusLabel: statusLabelOf(state, c),
         statusTone: st.tone,
         subtitle: [dateRange(c.startsAt, c.endsAt), `${c.hoursFrom}–${c.hoursTo}`, service, `${formatMeters(c.radiusM)} quanh quán`].join(' · '),
         canPause: manage && c.status === 'active',
@@ -972,6 +1141,7 @@ export function createBusinessService(db: Db, businessId: string) {
           { label: 'Đã chi', value: formatVnd(c.spent), sub: `${formatVnd(perCode)} mỗi mã` },
           { label: 'Ngân sách còn', value: formatVnd(left), sub: `trên ${formatVnd(c.budget)} ngân sách` },
         ],
+        adViews: adViewsStat(c.adViewCount ?? 0, adFrom),
         chart: {
           title: 'Mã được dùng mỗi ngày',
           ...dailyChart(daily, 'mã', 'mã của chiến dịch được dùng mỗi ngày'),
@@ -1060,7 +1230,7 @@ export function createBusinessService(db: Db, businessId: string) {
       const startDate = mode === 'edit' && from && new Date(from.startsAt).getTime() >= now.getTime() ? from.startsAt : null;
       const withImage = list.filter((c) => c.imageUrl).sort((a, z) => z.createdAt.localeCompare(a.createdAt))[0];
       const imageUrl = from?.imageUrl ?? withImage?.imageUrl ?? b.logoUrl;
-      const fileName = imageUrl ? decodeURIComponent(imageUrl.split('/').pop() ?? '').split('?')[0] : '';
+      const fileName = imageFileName(imageUrl);
       return {
         mode,
         fromId: mode === 'edit' && from ? from.id : null,
@@ -1081,7 +1251,10 @@ export function createBusinessService(db: Db, businessId: string) {
         vehicles: VEHICLE_ORDER.map((v) => ({ value: v, label: BIZ_VEHICLE_LABEL[v][0].toUpperCase() + BIZ_VEHICLE_LABEL[v].slice(1) })),
         audience: audienceRows.length ? Object.fromEntries(audienceRows.map((r) => [r.key, r.value])) : null,
         image: imageUrl
-          ? { name: fileName || 'Ảnh chiến dịch', meta: from?.imageUrl ? 'ảnh của chiến dịch này' : 'dùng lại từ chiến dịch trước' }
+          ? {
+              name: fileName || (imageUrl === b.logoUrl ? 'Logo cửa hàng' : 'Ảnh chiến dịch'),
+              meta: from?.imageUrl ? 'ảnh của chiến dịch này' : imageUrl === b.logoUrl ? 'logo trong Hồ sơ cửa hàng' : 'dùng lại từ chiến dịch trước',
+            }
           : { name: `Biểu tượng ${b.industry.split('·').pop()?.trim().toLowerCase() || 'cửa hàng'}`, meta: 'Dùng khi chưa có ảnh riêng' },
         values: {
           name: mode === 'edit' && from ? from.name : from ? `${from.name} (bản sao)` : `Chiến dịch tháng ${pad2(vnParts(nextMonthStart).month)}/${vnParts(nextMonthStart).year}`,
@@ -1152,6 +1325,7 @@ export function createBusinessService(db: Db, businessId: string) {
         spent: 0,
         issuedCount: 0,
         usedCount: 0,
+        adViewCount: 0,
         imageUrl: b.logoUrl,
         submittedAt: opts.draft ? null : now,
         approvedAt: null,
@@ -1208,6 +1382,16 @@ export function createBusinessService(db: Db, businessId: string) {
           const e = latestEvent(events, c.id, 'Tạm dừng');
           return `Chiến dịch ${bizServiceLabel(c.providerId, c.vehicleClass)} tạm dừng${e ? ` từ ${formatDayMonth(e.at)}` : ''} nên ít chuyến hơn.`;
         });
+      // Khung giờ từng chiến dịch có chạy trong tháng: số theo giờ gộp mọi chiến dịch, nên ghi rõ để không bị hiểu lầm.
+      const windows = list
+        .filter((c) => (c.status === 'active' || c.status === 'paused' || c.status === 'ended') && overlaps(c, period) && c.issuedCount > 0)
+        .map((c) => {
+          const e = c.status === 'paused' ? latestEvent(events, c.id, 'Tạm dừng') : undefined;
+          return `${bizServiceLabel(c.providerId, c.vehicleClass)} ${c.hoursFrom}–${c.hoursTo}${
+            c.status === 'paused' ? (e ? ` (tạm dừng từ ${formatDayMonth(e.at)})` : ' (đang tạm dừng)') : ''
+          }`;
+        });
+      const hoursNote = windows.length > 1 ? `Gộp mọi chiến dịch trong tháng: ${windows.join('; ')}.` : null;
       const distTotal = sumOf(districts);
       const distMax = Math.max(1, ...districts.map((r) => r.value));
 
@@ -1242,6 +1426,7 @@ export function createBusinessService(db: Db, businessId: string) {
             ? `Số chuyến theo giờ, cao nhất lúc ${peak.peakHour} giờ với ${formatNumber(peak.peakValue)} chuyến`
             : 'Chưa có số liệu theo giờ',
           peakText: peak ? `Khách đến nhiều nhất ${pad2(peak.from)}:00–${pad2(peak.to)}:00` : 'Chưa có số liệu',
+          note: hoursNote,
         },
         services: services.map((r) => {
           const [p, v] = r.key.split('-') as [ProviderId, VehicleClass];
@@ -1275,8 +1460,94 @@ export function createBusinessService(db: Db, businessId: string) {
               ? `${WEEKDAY_NAME[weekdayRows[wkMax].key].replace(/^t/, 'T')} nhiều chuyến nhất với ${formatNumber(weekdayRows[wkMax].value)} chuyến`
               : 'Chưa có số liệu theo ngày trong tuần',
         },
+        adViews: adViewsStat(
+          list.reduce((s, c) => s + (c.adViewCount ?? 0), 0),
+          await adSince(),
+        ),
         hasData: daily.length > 0 || totals.used > 0,
       };
+    },
+
+    /* ───── Quảng cáo: banner popup sau màn So giá (chốt 27/11/2026) ───── */
+
+    /** Trang Quảng cáo: banner đang chạy, bản chờ duyệt / bị từ chối gần nhất, lượt xem, quy định. */
+    async getAd(): Promise<BizAdView> {
+      const [b, banners, list, manage] = await Promise.all([
+        business(),
+        db.list('ad_banners', { where: { businessId } }),
+        campaigns(),
+        canManage(),
+      ]);
+      const byNewest = [...banners].sort((x, y) => y.submittedAt.localeCompare(x.submittedAt));
+      const running = byNewest
+        .filter((a) => a.status === 'approved')
+        .sort((x, y) => (y.reviewedAt ?? '').localeCompare(x.reviewedAt ?? ''))[0];
+      const pending = byNewest.find((a) => a.status === 'pending');
+      // Bị từ chối: chỉ hiện nếu là bản gửi mới nhất (gửi lại thì thôi).
+      const rejected = byNewest[0]?.status === 'rejected' ? byNewest[0] : undefined;
+      const toView = async (a: AdBanner, statusText: string): Promise<BizAdBannerView> => ({
+        id: a.id,
+        imageUrl: await db.files.viewUrl(a.imageUrl),
+        title: a.title,
+        body: a.body,
+        statusText,
+      });
+      const views = list.reduce((s, c) => s + (c.adViewCount ?? 0), 0);
+      const sample = list.find(isRunning) ?? list.find((c) => c.status === 'active') ?? list[0];
+      return {
+        running: running ? await toView(running, `Đang hiện trong app từ ${formatDate(running.reviewedAt ?? running.submittedAt)}`) : null,
+        pending: pending ? await toView(pending, `Gửi ${formatDate(pending.submittedAt)}, Frego duyệt trong 1 ngày làm việc`) : null,
+        rejected: rejected
+          ? { ...(await toView(rejected, `Bị từ chối ngày ${formatDate(rejected.reviewedAt ?? rejected.submittedAt)}`)), reason: rejected.rejectReason ?? '' }
+          : null,
+        adViews: adViewsStat(views, await adSince()),
+        canSubmit: manage && !pending,
+        submitBlockedText: !manage ? 'Chỉ chủ cửa hàng gửi được banner.' : pending ? 'Đang có banner chờ duyệt. Chờ Frego duyệt xong rồi gửi bản mới.' : null,
+        preview: {
+          name: b.name,
+          category: b.category,
+          industry: b.industry,
+          address: b.address,
+          giftText: sample
+            ? `Voucher ${formatDiscount(sample.amount)} ${bizServiceLabel(sample.providerId, sample.vehicleClass)} chuyến này là quà của ${b.name}.`
+            : `Voucher chuyến này là quà của ${b.name}.`,
+        },
+        rules: AD_RULES,
+      };
+    },
+
+    /** Gửi banner mới (chờ Frego duyệt). Bản đang chạy vẫn hiện tới khi bản mới được duyệt. */
+    async submitAd(input: {
+      file: { bytes: Uint8Array; contentType: string; name: string } | null;
+      title: string;
+      body: string;
+    }): Promise<{ ok: true } | { ok: false; field: 'file' | 'title' | 'body' | null; error: string }> {
+      if (!(await canManage())) return { ok: false, field: null, error: 'Chỉ chủ cửa hàng gửi được banner.' };
+      const title = input.title.trim().replace(/\s+/g, ' ');
+      const body = input.body.trim().replace(/\s+/g, ' ');
+      const f = input.file;
+      if (!f || !f.bytes.length) return { ok: false, field: 'file', error: 'Chọn ảnh banner.' };
+      const ext = AD_IMAGE_TYPES[f.contentType];
+      if (!ext) return { ok: false, field: 'file', error: 'Ảnh phải là JPG, PNG hoặc WebP.' };
+      if (f.bytes.length > AD_IMAGE_MAX_BYTES) return { ok: false, field: 'file', error: 'Ảnh tối đa 1 MB.' };
+      if (!title) return { ok: false, field: 'title', error: 'Nhập tiêu đề.' };
+      if (title.length > AD_TITLE_MAX) return { ok: false, field: 'title', error: `Tiêu đề tối đa ${AD_TITLE_MAX} ký tự.` };
+      if (body.length > AD_BODY_MAX) return { ok: false, field: 'body', error: `Nội dung tối đa ${AD_BODY_MAX} ký tự.` };
+      const pending = await db.list('ad_banners', { where: { businessId, status: 'pending' }, limit: 1 });
+      if (pending.length) return { ok: false, field: null, error: 'Đang có banner chờ duyệt. Chờ Frego duyệt xong rồi gửi bản mới.' };
+      const imageUrl = await db.files.uploadPrivate(businessId, { bytes: f.bytes, contentType: f.contentType, ext });
+      await db.insert('ad_banners', {
+        businessId,
+        imageUrl,
+        title,
+        body,
+        status: 'pending',
+        rejectReason: null,
+        submittedAt: db.now().toISOString(),
+        reviewedAt: null,
+        reviewedBy: null,
+      });
+      return { ok: true };
     },
 
     /** Báo cáo dạng CSV (UTF-8 có BOM để Excel đọc đúng tiếng Việt). Chỉ số tổng hợp. */
@@ -1403,14 +1674,11 @@ export function createBusinessService(db: Db, businessId: string) {
         balance: b.walletBalance,
         balanceText: formatVnd(b.walletBalance),
         coverText,
-        autoTopup: {
-          enabled: b.autoTopup.enabled,
-          title: `Tự nạp ${formatVnd(b.autoTopup.amount)}`,
-          sub: `khi số dư dưới ${formatVnd(b.autoTopup.threshold)}, từ thẻ đã lưu`,
-        },
         topupOptions: BIZ_TOPUP_OPTIONS.map((v) => ({ value: v, label: formatVnd(v) })),
         defaultTopup: 5000000,
         transferCode: b.transferCode,
+        nextReference: topupReference(b.transferCode, nextTopupNumber(b.transferCode, txs.map((t) => t.reference))),
+        bank: { ...brand.bank },
         transactions,
         invoices: invoiceViews,
         invoiceEmail: b.invoiceEmail,
@@ -1418,29 +1686,69 @@ export function createBusinessService(db: Db, businessId: string) {
       };
     },
 
-    /** "Tôi đã chuyển khoản": ghi một lần nạp chờ khớp với nội dung chuyển khoản của doanh nghiệp. */
-    async reportTransfer(amount: number): Promise<{ transaction: WalletTransaction; message: string }> {
-      if (!Number.isInteger(amount) || amount < 100000 || amount > 500_000_000) {
-        throw new BizServiceError('Số tiền nạp từ 100.000đ đến 500.000.000đ.');
-      }
-      const b = await business();
-      const transaction = await db.insert('wallet_transactions', {
-        businessId,
-        kind: 'topup',
-        amount,
-        note: 'Nạp chuyển khoản',
-        status: 'pending',
-        reference: b.transferCode,
-        createdAt: db.now().toISOString(),
-      });
-      return { transaction, message: 'Đang chờ ngân hàng xác nhận, thường dưới 5 phút. Frego sẽ báo khi tiền vào ví.' };
+    /**
+     * "Tôi đã chuyển khoản": ghi một lần nạp chờ khớp. Mỗi lần có nội dung chuyển khoản RIÊNG ("FREGO CPM1024-2"),
+     * nên hai lần nạp cùng số tiền vẫn khớp đúng từng dòng (SQL: chỉ mục duy nhất trên reference của lần nạp).
+     * `reference`: nội dung đã hiện cho người dùng (nếu còn chưa ai dùng thì giữ, để khớp đúng chữ họ đã chuyển).
+     */
+    async reportTransfer(amount: number, reference?: string | null): Promise<{ transaction: WalletTransaction; message: string }> {
+      checkTopupAmount(amount);
+      const transaction = await insertTopup(amount, 'Nạp chuyển khoản', reference ?? null, null);
+      return {
+        transaction,
+        message: `Đã ghi nhận lần nạp ${formatVnd(amount)} với nội dung ${transaction.reference}. Frego khớp tiền trong giờ làm việc, thường dưới 30 phút, và báo khi tiền vào ví.`,
+      };
     },
 
-    /** Bật/tắt tự nạp khi số dư thấp. */
-    async setAutoTopup(enabled: boolean): Promise<Business> {
-      await requireOwner();
-      const b = await business();
-      return db.update('businesses', businessId, { autoTopup: { ...b.autoTopup, enabled } });
+    /**
+     * Nạp qua PayOS: ghi lần nạp chờ với mã đơn (orderCode) để webhook khớp tự động. Trang web gọi PayOS tạo link
+     * thanh toán bằng mã đơn này (chỉ ở máy chủ, có khóa bí mật).
+     */
+    async startPayosTopup(amount: number, orderCode: number): Promise<{ transaction: WalletTransaction }> {
+      checkTopupAmount(amount);
+      if (!Number.isSafeInteger(orderCode) || orderCode <= 0) throw new BizServiceError('Mã đơn không hợp lệ.');
+      const transaction = await insertTopup(amount, 'Nạp qua PayOS · VietQR', null, orderCode);
+      return { transaction };
+    },
+
+    /** Lần nạp PayOS của doanh nghiệp theo mã đơn (trang quay về sau khi thanh toán). */
+    async getPayosTopup(orderCode: number): Promise<{ status: WalletTransaction['status']; amountText: string } | null> {
+      const rows = await db.list('wallet_transactions', { where: { businessId, kind: 'topup' } });
+      const tx = rows.find((t) => t.orderCode === orderCode);
+      return tx ? { status: tx.status, amountText: formatVnd(tx.amount) } : null;
+    },
+
+    /** Hóa đơn tháng (trang in / lưu PDF bằng trình duyệt). */
+    async getInvoice(id: string): Promise<{
+      title: string;
+      issued: boolean;
+      statusText: string;
+      issuedText: string | null;
+      seller: { name: string; email: string; hotline: string };
+      buyer: { name: string; taxCode: string; address: string; email: string };
+      lines: { label: string; value: string }[];
+      totalText: string;
+    } | null> {
+      const [b, inv] = await Promise.all([business(), db.get('invoices', id)]);
+      if (!inv || inv.businessId !== businessId) return null;
+      const [y, m] = inv.month.split('-').map(Number);
+      const [from, to] = periodBounds(inv.month);
+      const camps = (await campaigns()).filter((c) => new Date(c.startsAt).getTime() < to && new Date(c.endsAt).getTime() >= from);
+      const used = camps.reduce((s, c) => s + c.usedCount, 0);
+      return {
+        title: `Hóa đơn tháng ${pad2(m)}/${y}`,
+        issued: inv.status === 'issued',
+        statusText: inv.status === 'issued' ? 'Đã xuất' : 'Tạm tính, chưa xuất',
+        issuedText: inv.issuedAt ? formatDate(inv.issuedAt) : null,
+        seller: { name: brand.company.legalName, email: brand.company.businessEmail, hotline: brand.company.hotline },
+        buyer: { name: b.invoiceName || b.legalName || b.name, taxCode: b.taxCode, address: b.address, email: b.invoiceEmail },
+        lines: [
+          { label: 'Kỳ', value: `${formatDate(new Date(from))} – ${formatDate(new Date(to - DAY_MS))}` },
+          { label: 'Mã được dùng', value: used ? `${formatNumber(used)} mã` : '—' },
+          { label: 'Nội dung', value: 'Giá trị giảm của mã đã dùng và phí dịch vụ Frego, đã trừ từ ví' },
+        ],
+        totalText: formatVnd(inv.amount),
+      };
     },
 
     /* ───── DN 7 · Hồ sơ cửa hàng ───── */
@@ -1452,7 +1760,8 @@ export function createBusinessService(db: Db, businessId: string) {
         canManage(),
       ]);
       const me = db.currentUserId();
-      const logoName = b.logoUrl ? decodeURIComponent(b.logoUrl.split('/').pop() ?? '').split('?')[0] : '';
+      // Ảnh DEMO là data URL: không có tên tệp.
+      const logoName = b.logoUrl && !b.logoUrl.startsWith('data:') ? decodeURIComponent(b.logoUrl.split('/').pop() ?? '').split('?')[0] : '';
       return {
         name: b.name,
         industry: b.industry,
@@ -1460,8 +1769,8 @@ export function createBusinessService(db: Db, businessId: string) {
         landmark: b.landmark,
         category: b.category,
         logo: b.logoUrl
-          ? { title: `Logo · ${logoName || 'ảnh đã tải'}`, sub: 'Ảnh vuông 1080 × 1080, dùng mặc định cho chiến dịch' }
-          : { title: 'Logo · biểu tượng theo ngành', sub: 'Tải ảnh vuông 1080 × 1080 để dùng mặc định cho chiến dịch' },
+          ? { title: `Logo · ${logoName || 'ảnh đã tải'}`, sub: 'Ảnh vuông 1080 × 1080, dùng mặc định cho chiến dịch', imageUrl: b.logoUrl }
+          : { title: 'Logo · biểu tượng theo ngành', sub: 'Tải ảnh vuông 1080 × 1080 để dùng mặc định cho chiến dịch', imageUrl: null },
         openHours: [
           { label: 'Thứ Hai – Thứ Sáu', value: b.openHours.weekdays },
           { label: 'Thứ Bảy', value: b.openHours.saturday },
@@ -1496,6 +1805,18 @@ export function createBusinessService(db: Db, businessId: string) {
      * Lưu hồ sơ (chỉ các cột BIZ_PROFILE_FIELDS). Đổi địa chỉ thì chiến dịch đang chạy chờ Frego duyệt lại
      * (Supabase: trigger businesses_address_guard; DEMO: làm tương tự ở đây).
      */
+    /** Đổi logo quán (Hồ sơ cửa hàng): JPG/PNG/WebP ≤ 1 MB, chỉ chủ quán. Logo hiện ngay trong app (ghim, popup). */
+    async updateLogo(file: { bytes: Uint8Array; contentType: string; name: string }): Promise<{ logoUrl: string }> {
+      await requireOwner();
+      const ext = AD_IMAGE_TYPES[file.contentType];
+      if (!ext) throw new BizServiceError('Logo phải là ảnh JPG, PNG hoặc WebP.', 'logo');
+      if (!file.bytes.length) throw new BizServiceError('Chọn ảnh logo.', 'logo');
+      if (file.bytes.length > AD_IMAGE_MAX_BYTES) throw new BizServiceError('Logo tối đa 1 MB.', 'logo');
+      const logoUrl = await db.files.uploadLogo(businessId, { bytes: file.bytes, contentType: file.contentType, ext });
+      await db.update('businesses', businessId, { logoUrl });
+      return { logoUrl };
+    },
+
     async updateProfile(patch: BizProfilePatch): Promise<{ business: Business; message: string; rereview: number }> {
       await requireOwner();
       const clean: BizProfilePatch = {};
@@ -1522,7 +1843,12 @@ export function createBusinessService(db: Db, businessId: string) {
       if (first) throw new BizServiceError(first[1], first[0]);
 
       const before = await business();
-      const business_ = await db.update('businesses', businessId, clean);
+      // Quận đi theo địa chỉ mới (danh sách quản trị hiện quận): đổi địa chỉ mà không đọc được quận thì giữ quận cũ.
+      const district = clean.address !== undefined ? districtOf(clean.address) : '';
+      const business_ = await db.update('businesses', businessId, {
+        ...clean,
+        ...(district && district !== before.district ? { district } : {}),
+      });
       const moved =
         (clean.address !== undefined && clean.address !== before.address) ||
         (clean.lat !== undefined && clean.lat !== before.lat) ||
@@ -1531,9 +1857,13 @@ export function createBusinessService(db: Db, businessId: string) {
       if (moved) {
         const running = (await campaigns()).filter((c) => c.status === 'active');
         rereview = running.length;
+        // Supabase: trigger businesses_address_guard chuyển chiến dịch + ghi sự kiện (migration 20261127001000).
         if (db.mode === 'demo') {
           const at = db.now().toISOString();
-          for (const c of running) await db.update('campaigns', c.id, { status: 'pending', submittedAt: at });
+          for (const c of running) {
+            await db.update('campaigns', c.id, { status: 'pending', submittedAt: at });
+            await addEvent(c.id, BIZ_EV_ADDRESS_REREVIEW);
+          }
         }
       }
       return {
@@ -1543,6 +1873,20 @@ export function createBusinessService(db: Db, businessId: string) {
           ? `Đã lưu hồ sơ cửa hàng. Địa chỉ thay đổi nên ${rereview} chiến dịch đang chạy chờ Frego duyệt lại.`
           : 'Đã lưu hồ sơ cửa hàng.',
       };
+    },
+
+    /** Xóa thành viên (chủ cửa hàng). Không xóa chính mình và không để cửa hàng không còn chủ. */
+    async removeMember(memberId: string): Promise<{ message: string }> {
+      await requireOwner();
+      const members = await db.list('business_members', { where: { businessId } });
+      const m = members.find((x) => x.id === memberId);
+      if (!m) throw new BizServiceError('Không tìm thấy thành viên.');
+      if (m.userId && m.userId === db.currentUserId()) throw new BizServiceError('Không tự xóa chính mình được.');
+      if (m.role === 'owner' && members.filter((x) => x.role === 'owner').length <= 1) {
+        throw new BizServiceError('Cửa hàng cần ít nhất một chủ cửa hàng.');
+      }
+      await db.remove('business_members', m.id);
+      return { message: `Đã xóa ${m.email} khỏi cửa hàng.` };
     },
 
     /** Mời thành viên theo email (tài khoản tự gắn khi người đó đăng ký bằng email này). */

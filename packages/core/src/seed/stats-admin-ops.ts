@@ -23,8 +23,9 @@ export const adminOpsStats: StatRow[] = [
   ...series(P, 'recon_payable', NOV, [['grab', 36371600], ['be', 16400000], ['gsm', 2475000]]),
 
   /* QT 8 · Điểm và mã Frego */
-  ...series(P, 'points_awarded', NOV, [['total', 186400]]),
-  ...series(P, 'points_awarded', OCT, [['total', 158000]]),
+  // = lượt quy tắc × điểm (2.840 × 10 + 736 × 50 + 420 × 50 = 86.200), khớp bảng quy tắc ở QT 8.
+  ...series(P, 'points_awarded', NOV, [['total', 86200]]),
+  ...series(P, 'points_awarded', OCT, [['total', 74300]]),
   ...series(P, 'price_reports', NOV, [['total', 3996]]),
   // Lượt áp dụng từng quy tắc; daily_cap = số người chạm giới hạn ngày.
   ...series(P, 'points_rule_uses', NOV, [['tap', 2840], ['amount', 736], ['receipt', 420], ['daily_cap', 12]]),

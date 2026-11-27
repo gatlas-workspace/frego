@@ -99,6 +99,17 @@ export const colors = {
   mapWater: '#D3E4F7',
   mapPark: '#D9EEDF',
   mapBlock: '#E2E6EF',
+  /** Vùng tặng mã quanh quán trên bản đồ thật (màu chính, trong suốt) */
+  mapZoneFill: 'rgba(61,59,212,0.12)',
+  mapZoneStroke: 'rgba(61,59,212,0.55)',
+  /** Vòng 1 km tìm quán quanh điểm đến (kiểu thongtincty) */
+  mapNearbyFill: 'rgba(61,59,212,0.08)',
+  mapNearbyStroke: 'rgba(61,59,212,0.70)',
+  /** Chấm "Vị trí của bạn" */
+  mapUser: '#10B981',
+  /** Bong bóng cụm ghim (kiểu leaflet.markercluster: viền xanh lá nhạt, lõi xanh lá) */
+  mapClusterOuter: 'rgba(181,226,140,0.75)',
+  mapClusterInner: 'rgba(110,204,57,0.85)',
 } as const;
 
 export const radius = {

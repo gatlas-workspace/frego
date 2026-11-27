@@ -30,9 +30,13 @@ import {
   formatVndRange,
   initials,
   maskPhone,
+  vnParts,
 } from '../format';
-import { distanceM, estimateRoute, type LatLng } from '../geo';
+import { distanceM, estimateRoute, roundMeters, type LatLng } from '../geo';
 import { isPeak } from '../pricing';
+import { routeVehicleOf, type RoadRoute, type Router, type RouteVehicle } from '../routing';
+import { geoPlaceId, parseGeoPlaceId, parseGoongPlaceRef, type Geocoder, type GeoHit } from '../geocoding';
+import { parseReceipt, type ReceiptEmail } from '../receipts';
 import type {
   AppNotification,
   AttachedCode,
@@ -55,18 +59,48 @@ import type {
 } from '../types';
 import {
   attachCtaText,
+  autoSelect,
   comparePrices,
   evaluateOffers,
   selectedOffers,
+  sortEligible,
   type CodeOffer,
   type EligibleOffer,
   type OfferEvaluation,
+  type OfferPriority,
   type PriceRow,
   type Selection,
   type TripContext,
 } from '../vouchers';
 
 /* ───────────────────────── Kiểu dữ liệu màn hình ───────────────────────── */
+
+/** Ưu đãi tại quán đã lưu (Ví › Tại quán): nội dung banner quán tài trợ người dùng đã xem trong ngày. */
+export interface ShopOfferView {
+  tripId: string;
+  businessId: string;
+  name: string;
+  address: string;
+  category: CategoryKey;
+  logoUrl: string | null;
+  title: string;
+  body: string;
+  imageUrl: string;
+  /** "Xem lúc 17:47 hôm nay · dùng trong ngày" */
+  whenText: string;
+  lat: number;
+  lng: number;
+}
+
+/** Điểm đón đã chọn: vị trí thật (GPS / trình duyệt) hoặc người dùng sửa tay. */
+export interface PickupPoint extends LatLng {
+  /** Tên ngắn để hiện ("720A Điện Biên Phủ", "Chợ Bến Thành") */
+  name: string;
+  address: string;
+  /** Id địa điểm có sẵn (places) nếu chọn từ danh sách; null khi là tọa độ tự do */
+  placeId: string | null;
+  source: 'gps' | 'manual';
+}
 
 export interface PlaceView {
   id: string;
@@ -77,6 +111,8 @@ export interface PlaceView {
   /** "3 voucher" hoặc "" */
   voucherChip: string;
   voucherCount: number;
+  /** Kết quả chỉ là con đường (không có số nhà): chọn thì mở bản đồ tại đây để ghim đúng nhà */
+  pickOnMap: LatLng | null;
 }
 
 export interface SavedPlaceView {
@@ -85,6 +121,12 @@ export interface SavedPlaceView {
   label: string;
   placeId: string;
   icon: 'home' | 'brief' | 'pin';
+}
+
+/** URL ảnh an toàn để hiện: http(s) hoặc ảnh nhúng PNG/JPEG/WebP (logo ở DEMO). Còn lại → null. */
+export function safeImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return /^https?:\/\//i.test(url) || /^data:image\/(png|jpeg|webp);base64,/i.test(url) ? url : null;
 }
 
 export interface DealView {
@@ -100,6 +142,43 @@ export interface DealView {
   cta: string;
   /** Điểm đến khi bấm (địa điểm gần quán nhất) */
   destPlaceId: string;
+}
+
+/**
+ * Vòng tham chiếu quanh điểm đến trên bản đồ chuyến (1 km), để người dùng ước lượng khoảng cách xung quanh.
+ * Chỉ để nhìn: không dùng để lọc quán (chốt 27/11/2026).
+ */
+export const DEST_RING_M = 1000;
+
+/**
+ * Ghim quán tài trợ trên bản đồ chuyến: chỉ quán có voucher dùng được cho chuyến này (điểm đến trong vùng tặng mã của quán).
+ * Chỉ thông tin công khai của quán, không có người nhận mã.
+ */
+export interface SponsorPinView {
+  businessId: string;
+  /** Chiến dịch giảm nhiều nhất của quán (ưu tiên gắn khi chọn quán làm điểm đến) */
+  campaignId: string;
+  name: string;
+  category: CategoryKey;
+  /** Logo quán (chỉ URL http/https); null → ghim dùng icon ngành */
+  logoUrl: string | null;
+  address: string;
+  lat: number;
+  lng: number;
+  /** Bán kính vùng tặng mã quanh quán (m) */
+  radiusM: number;
+  /** "Cách điểm đến 150 m" */
+  distanceText: string;
+  /** "−20.000đ" */
+  amountText: string;
+  /** "Grab ô tô" (thêm "· 2 ưu đãi" nếu quán có nhiều chiến dịch) */
+  serviceText: string;
+  /** "Tặng mã 07:00–22:00" */
+  hoursText: string;
+  /** "Điểm đến nằm trong vùng tặng mã 500 m" / "Voucher tặng riêng cho bạn, điểm đến trong vùng 500 m quanh quán" */
+  statusText: string;
+  /** Nhãn đọc màn hình cho ghim */
+  a11yLabel: string;
 }
 
 export interface BannerView {
@@ -121,11 +200,27 @@ export interface HomeView {
   unreadCount: number;
 }
 
+/** Đường vẽ trên bản đồ: theo đường phố (`road`) hoặc nối thẳng khi không tìm được đường (`estimate`). */
+export interface TripRouteLine {
+  coords: LatLng[];
+  source: 'road' | 'estimate';
+}
+
+export interface UserServiceOptions {
+  /** Bộ tìm đường theo đường phố. Không có → km/phút ước tính theo đường chim bay (như trước). */
+  router?: Router | null;
+  /** Bộ tìm địa chỉ (Goong / Photon). Không có → chỉ tìm trong địa điểm có sẵn, không chọn được địa chỉ tự do. */
+  geocoder?: Geocoder | null;
+}
+
 export interface TripPlan {
   origin: { label: string; placeId: string | null } & LatLng;
   dest: Place;
+  /** Theo đường xe máy thật nếu tìm được (chốt 27/11/2026), không thì ước tính */
   km: number;
   minutes: number;
+  /** Đường xe máy (loại xe mặc định) */
+  route: TripRouteLine;
   at: string;
   peak: boolean;
   /** "Landmark 81 → Chợ Bến Thành" */
@@ -163,6 +258,31 @@ export interface ComparisonView {
   attachedLine: string;
   /** "17:40 là giờ cao điểm, khoảng giá đã nới rộng. Giá cuối cùng do app hãng hiển thị." */
   peakNote: string | null;
+}
+
+/**
+ * Popup quảng cáo nhà tài trợ (màn 2c, chốt 27/11/2026): hiện sau khi chọn hãng ở So giá nếu mã gắn ở hãng đó là của
+ * quán tài trợ. Có banner đã duyệt thì hiện banner; chưa có thì popup gọn với thông tin quán.
+ */
+export interface SponsorAdView {
+  campaignId: string;
+  businessId: string;
+  name: string;
+  category: CategoryKey;
+  logoUrl: string | null;
+  /** "Ăn uống · Cà phê" */
+  industry: string;
+  address: string;
+  /** "Cách điểm đến 150 m" */
+  distanceText: string;
+  /** "Mở cửa hôm nay 07:00 – 22:00" */
+  hoursText: string;
+  /** "Voucher −20.000đ Grab ô tô chuyến này là quà của Cà phê Mây." */
+  giftText: string;
+  /** Banner đã duyệt (null → popup gọn) */
+  banner: { imageUrl: string; title: string; body: string } | null;
+  /** Chữ nút chính trên popup: "Nhận mã giảm giá" (chốt 27/11/2026) */
+  ctaLabel: string;
 }
 
 export interface OpenAppView {
@@ -315,6 +435,31 @@ export interface MeView {
   locationOn: boolean;
 }
 
+/** Trạng thái "Tự lấy giá từ biên nhận email" (Gmail). */
+export interface GmailStatusView {
+  linked: boolean;
+  /** Liên kết giả lập của chế độ DEMO (không có Google thật) */
+  demo: boolean;
+  email: string | null;
+  /** "Đồng bộ lần cuối 17:58, 22/11" hoặc null */
+  lastSyncText: string | null;
+  /** Số chuyến đã tự ghi giá từ biên nhận */
+  matchedCount: number;
+  /** Lỗi lần đồng bộ trước (VD Google thu hồi quyền → cần liên kết lại) */
+  error: string | null;
+}
+
+/** Kết quả một lần đọc biên nhận (máy chủ trả cùng dạng). */
+export interface GmailSyncResult {
+  /** Số thư biên nhận đã xét */
+  checked: number;
+  /** Số chuyến được ghi giá */
+  matched: number;
+  pointsAwarded: number;
+  /** Lý do giữ điểm gần nhất (nếu có) */
+  held: string | null;
+}
+
 export interface LinkRowView {
   partnerId: string;
   kind: Partner['kind'];
@@ -335,7 +480,23 @@ export interface NotificationView extends AppNotification {
 
 const VEHICLE_KIND: Record<VehicleClass, 'bike' | 'car' | 'suv'> = { bike: 'bike', car4: 'car', car7: 'suv' };
 
-export function createUserService(db: Db) {
+export function createUserService(db: Db, opts: UserServiceOptions = {}) {
+  const router = opts.router ?? null;
+  const geocoder = opts.geocoder ?? null;
+  /** Nhớ đường đã tìm (mỗi cặp điểm + loại xe một lần): đúng giới hạn 1 lượt/giây của máy chủ công cộng. */
+  const routeCache = new Map<string, Promise<RoadRoute | null>>();
+  const roadRoute = (from: LatLng, to: LatLng, vehicle: RouteVehicle) => {
+    if (!router) return Promise.resolve(null);
+    const key = `${from.lat},${from.lng}>${to.lat},${to.lng}:${vehicle}`;
+    let p = routeCache.get(key);
+    if (!p) {
+      p = router.route(from, to, vehicle);
+      // Lỗi thì không nhớ, lần sau thử lại.
+      p.then((r) => (r ? undefined : routeCache.delete(key)));
+      routeCache.set(key, p);
+    }
+    return p;
+  };
   const me = () => {
     const id = db.currentUserId();
     if (!id) throw new Error('Cần đăng nhập');
@@ -357,10 +518,25 @@ export function createUserService(db: Db) {
     return camps.filter((c) => byId.has(c.businessId)).map((c) => ({ ...c, business: byId.get(c.businessId)! }));
   }
 
-  /** Vị trí hiện tại. DEMO: gần Landmark 81 (khớp thiết kế). */
+  /**
+   * Điểm đón người dùng chọn (chốt 27/11/2026): vị trí thật (GPS / định vị trình duyệt) hoặc sửa tay (tìm, ghim bản đồ).
+   * Chỉ giữ trong phiên (app tự lưu lại ở máy). null: điểm mặc định Landmark 81 (dữ liệu mẫu, khớp thiết kế).
+   */
+  let pickup: PickupPoint | null = null;
+
+  /** Điểm đón hiện tại. `label` "Vị trí hiện tại" = đúng chỗ người dùng đang đứng (bản đồ vẽ chấm xanh). */
   async function currentOrigin(): Promise<{ label: string; placeId: string | null } & LatLng> {
+    if (pickup) {
+      return { label: pickup.source === 'gps' ? 'Vị trí hiện tại' : pickup.name, placeId: pickup.placeId, lat: pickup.lat, lng: pickup.lng };
+    }
     const lm = await db.get('places', 'landmark81');
     return { label: 'Vị trí hiện tại', placeId: 'landmark81', lat: lm?.lat ?? 10.7949, lng: lm?.lng ?? 106.7219 };
+  }
+
+  /** Dòng "Điểm đón" ở Trang chủ / Chọn điểm đến. */
+  function pickupLabel(): string {
+    if (!pickup) return 'Landmark 81 · điểm mặc định';
+    return pickup.source === 'gps' ? `Vị trí hiện tại · ${pickup.name}` : pickup.name;
   }
 
   function countVouchersFor(place: Place, camps: (CampaignPublic & { business: BusinessPublic })[]) {
@@ -379,8 +555,21 @@ export function createUserService(db: Db) {
         distanceText: formatKm(route.km),
         voucherChip: n > 0 ? `${n} voucher` : '',
         voucherCount: n,
+        pickOnMap: null,
       } satisfies PlaceView;
     });
+  }
+
+  /** Điểm đến từ id: địa điểm có sẵn, "biz:<quán>", "geo:…" (địa chỉ tự do) hoặc "goong:…" (hỏi Goong tọa độ). */
+  async function resolveDest(destId: string): Promise<Place | null> {
+    if (destId.startsWith('biz:')) {
+      const b = await db.get('businesses_public', destId.slice(4));
+      return b ? { id: destId, name: b.name, address: b.address, district: b.district, lat: b.lat, lng: b.lng } : null;
+    }
+    if (destId.startsWith('geo:')) return parseGeoPlaceId(destId);
+    const g = parseGoongPlaceRef(destId);
+    if (g) return geocoder ? geocoder.detail(g.placeId, { name: g.name, address: g.address }) : null;
+    return db.get('places', destId);
   }
 
   async function myVouchers(): Promise<UserVoucher[]> {
@@ -574,6 +763,33 @@ export function createUserService(db: Db) {
       return db.update('profiles', me(), { ...patch, onboardedAt: nowIso() });
     },
 
+    /** Xóa tài khoản và mọi dữ liệu của người dùng (RPC tin cậy). App đăng xuất sau đó. */
+    async deleteMyAccount(): Promise<void> {
+      await db.rpc('delete_my_account', {});
+      pickup = null;
+    },
+
+    /** "Tải dữ liệu của tôi": mọi dữ liệu Frego giữ về người dùng, dạng JSON dễ đọc. */
+    async exportMyData(): Promise<string> {
+      const uid = me();
+      const tables = [
+        'consents',
+        'notification_prefs',
+        'saved_places',
+        'recent_searches',
+        'trips',
+        'user_vouchers',
+        'points_ledger',
+        'linked_accounts',
+        'notifications',
+      ] as const;
+      const out: Record<string, unknown> = { xuatLuc: nowIso(), hoSo: await db.get('profiles', uid) };
+      for (const t of tables) {
+        out[t] = await db.list(t, { where: { userId: uid } as never }).catch(() => []);
+      }
+      return JSON.stringify(out, null, 2);
+    },
+
     async getConsents(): Promise<Consents> {
       const uid = me();
       return (
@@ -678,7 +894,7 @@ export function createUserService(db: Db) {
       const recentPlaces = recent.map((r) => byId.get(r.placeId)).filter((p): p is Place => !!p);
       return {
         banner,
-        originLabel: origin.label,
+        originLabel: pickupLabel(),
         savedPlaces: saved.map((s) => ({
           id: s.id,
           kind: s.kind,
@@ -716,17 +932,85 @@ export function createUserService(db: Db) {
           const text = `${name} ${normalize(p.address)}`;
           const words = text.split(/[\s,]+/);
           const phrase = name.includes(q) ? 1 : 0;
-          const hits = tokens.filter((t) => words.some((w) => w.startsWith(t))).length;
+          // Từ đã gõ xong phải khớp nguyên từ; chỉ từ cuối (đang gõ) khớp đầu từ — "nha tho duc ba" không khớp
+          // "Nhất … bay" của Sân bay Tân Sơn Nhất (27/11/2026).
+          const hits = tokens.filter((t, i) => words.some((w) => (i === tokens.length - 1 ? w.startsWith(t) : w === t))).length;
           const lastOk = words.some((w) => w.startsWith(last));
           return { p, phrase, ratio: hits / tokens.length, ok: phrase === 1 || (lastOk && hits / tokens.length >= 0.5) };
         })
         .filter((x) => x.ok)
         .sort((a, b) => b.phrase - a.phrase || b.ratio - a.ratio);
-      return toPlaceViews(scored.slice(0, 8).map((x) => x.p), origin);
+      const local = await toPlaceViews(scored.slice(0, 8).map((x) => x.p), origin);
+      // Gõ từ 2 ký tự: hỏi thêm Goong/Photon. Lỗi mạng → chỉ còn địa điểm có sẵn.
+      if (!geocoder || q.length < 2) return local;
+      const hits = await geocoder.search(query.trim(), origin).catch(() => [] as GeoHit[]);
+      const camps = await activeCampaigns();
+      const remote = hits
+        // Bỏ trùng với địa điểm có sẵn (cùng tên, cách < 150 m).
+        .filter(
+          (h) =>
+            !scored.some((x) => {
+              const a = normalize(x.p.name);
+              const b = normalize(h.name);
+              return (a === b || a.includes(b) || b.includes(a)) && (h.lat === undefined || distanceM(x.p, h as LatLng) < 150);
+            }),
+        )
+        .map((h) => {
+          const at = h.lat !== undefined && h.lng !== undefined ? { lat: h.lat, lng: h.lng } : null;
+          const n = at ? countVouchersFor({ id: h.id, name: h.name, address: h.address, district: '', ...at }, camps) : 0;
+          return {
+            id: h.id,
+            name: h.name,
+            address: h.address,
+            distanceText: at ? formatKm(estimateRoute(origin, at).km) : '',
+            voucherChip: n > 0 ? `${n} voucher` : '',
+            voucherCount: n,
+            pickOnMap: h.street && at ? at : null,
+          } satisfies PlaceView;
+        });
+      return [...local, ...remote].slice(0, 10);
+    },
+
+    /** Chọn trên bản đồ: tọa độ → địa chỉ để hiện và id "geo:…" để lập chuyến. Không tìm được địa chỉ vẫn đi được. */
+    async describePoint(p: LatLng): Promise<{ id: string; name: string; address: string; found: boolean }> {
+      const place = geocoder ? await geocoder.reverse(p).catch(() => null) : null;
+      const name = place?.name || 'Điểm đã chọn trên bản đồ';
+      const address = place?.address || `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      return { id: geoPlaceId({ lat: p.lat, lng: p.lng, name, address }), name, address, found: !!place };
+    },
+
+    /** Tọa độ điểm đón hiện tại (tâm mặc định khi chọn trên bản đồ). */
+    async originPoint(): Promise<LatLng> {
+      const o = await currentOrigin();
+      return { lat: o.lat, lng: o.lng };
+    },
+
+    /** Đang dùng Goong hay Photon (để ghi nguồn), hoặc null nếu tắt. */
+    geocodingProvider(): Geocoder['provider'] | null {
+      return geocoder?.provider ?? null;
     },
 
     async currentOriginLabel(): Promise<string> {
-      return 'Vị trí hiện tại · gần Landmark 81';
+      return pickupLabel();
+    },
+
+    /** Đặt điểm đón: vị trí thật (`source: 'gps'`) hoặc sửa tay (`'manual'`); null = về điểm mặc định. */
+    setPickup(p: PickupPoint | null) {
+      pickup = p;
+      routeCache.clear();
+    },
+
+    /** Điểm đón đang dùng (null = mặc định). */
+    getPickup(): PickupPoint | null {
+      return pickup;
+    },
+
+    /** Điểm đón từ id địa điểm ("geo:…", id có sẵn, "goong:…") — màn Đổi điểm đón. */
+    async pickupFromPlace(placeId: string): Promise<PickupPoint | null> {
+      const p = await resolveDest(placeId);
+      if (!p) return null;
+      const known = !placeId.startsWith('geo:') && !placeId.startsWith('goong:') && !placeId.startsWith('biz:');
+      return { lat: p.lat, lng: p.lng, name: p.name, address: p.address, placeId: known ? p.id : null, source: 'manual' };
     },
 
     async addSavedPlace(input: { kind: SavedPlaceKind; label: string; placeId: string }) {
@@ -744,17 +1028,14 @@ export function createUserService(db: Db) {
     /** Lập kế hoạch chuyến tới điểm đến (placeId, hoặc "biz:<id>" để đi tới quán). */
     async planTrip(destId: string, opts: { preferredCampaignId?: string | null } = {}): Promise<TripPlan> {
       const origin = await currentOrigin();
-      let dest: Place | null;
-      if (destId.startsWith('biz:')) {
-        const b = await db.get('businesses_public', destId.slice(4));
-        dest = b ? { id: destId, name: b.name, address: b.address, district: b.district, lat: b.lat, lng: b.lng } : null;
-      } else {
-        dest = await db.get('places', destId);
-      }
+      const dest = await resolveDest(destId);
       if (!dest) throw new Error('Không tìm thấy điểm đến');
-      const route = estimateRoute({ ...origin, id: origin.placeId ?? undefined }, dest);
+      // Đường xe máy thật (chốt 27/11/2026: km, phút và giá theo đường thật); lỗi mạng → ước tính như cũ.
+      const road = await roadRoute(origin, dest, 'motorbike');
+      const route = road ?? estimateRoute({ ...origin, id: origin.placeId ?? undefined }, dest);
+      const line: TripRouteLine = road ? { coords: road.coords, source: 'road' } : { coords: [origin, dest], source: 'estimate' };
       const at = nowIso();
-      const base = { origin, dest, km: route.km, minutes: route.minutes, at };
+      const base = { origin, dest, km: route.km, minutes: route.minutes, route: line, at };
       const ctx = await tripContext(base);
       const evaluation = evaluateOffers(await buildOffers(), ctx);
       const selection: Selection = { ...evaluation.autoSelection };
@@ -762,7 +1043,11 @@ export function createUserService(db: Db) {
         const pref = evaluation.eligible.find((e) => e.offer.campaignId === opts.preferredCampaignId);
         if (pref) selection[pref.service] = pref.offer.refId;
       }
-      const originName = origin.placeId ? (await db.get('places', origin.placeId))?.name ?? origin.label : origin.label;
+      const originName = pickup
+        ? pickup.name
+        : origin.placeId
+          ? (await db.get('places', origin.placeId))?.name ?? origin.label
+          : origin.label;
       return {
         ...base,
         peak: isPeak(at),
@@ -774,8 +1059,72 @@ export function createUserService(db: Db) {
       };
     },
 
-    attachItems(plan: TripPlan, selection: Selection): AttachItemView[] {
-      return plan.evaluation.eligible.map((e) => {
+    /** Đường vẽ trên bản đồ theo loại xe (So giá: tab ô tô vẽ đường ô tô). Xe máy dùng lại đường của chuyến. */
+    async routeLine(plan: Pick<TripPlan, 'origin' | 'dest' | 'route'>, vehicleClass: VehicleClass): Promise<TripRouteLine> {
+      const vehicle = routeVehicleOf(vehicleClass);
+      if (vehicle === 'motorbike') return plan.route;
+      const road = await roadRoute(plan.origin, plan.dest, vehicle);
+      return road ? { coords: road.coords, source: 'road' } : plan.route;
+    },
+
+    /**
+     * Quán tài trợ có voucher **dùng được cho chuyến này** (chốt 27/11/2026): lấy đúng danh sách voucher hợp chuyến ở màn
+     * Gắn voucher (`plan.evaluation.eligible`) — điểm đến nằm trong vùng tặng mã riêng của quán (300 m–1 km), đúng khung
+     * giờ, đúng loại xe; gồm cả voucher tặng riêng trong ví. Không dùng bán kính cố định. Mỗi quán một ghim, gần trước.
+     */
+    async usableSponsors(plan: Pick<TripPlan, 'dest' | 'evaluation'>): Promise<SponsorPinView[]> {
+      const camps = new Map((await activeCampaigns()).map((c) => [c.id, c]));
+      const byBiz = new Map<string, { camp: CampaignPublic & { business: BusinessPublic }; e: EligibleOffer }[]>();
+      for (const e of plan.evaluation.eligible) {
+        const camp = e.offer.campaignId ? camps.get(e.offer.campaignId) : undefined;
+        if (!camp) continue;
+        byBiz.set(camp.businessId, [...(byBiz.get(camp.businessId) ?? []), { camp, e }]);
+      }
+      return [...byBiz.values()]
+        .map((list) => {
+          // Giảm nhiều nhất cho chuyến này trước (như thứ tự tự gắn mã).
+          const { camp: best, e } = [...list].sort((a, b) => b.e.discount - a.e.discount)[0]!;
+          const b = best.business;
+          const d = distanceM(plan.dest, b);
+          const radius = formatMeters(best.radiusM);
+          const distanceText = d < 25 ? 'Ngay tại điểm đến' : `Cách điểm đến ${formatMeters(roundMeters(d))}`;
+          const serviceText = e.serviceText + (list.length > 1 ? ` · ${list.length} ưu đãi` : '');
+          const statusText = e.offer.inWallet
+            ? `Voucher tặng riêng cho bạn, điểm đến trong vùng ${radius} quanh quán`
+            : `Điểm đến nằm trong vùng tặng mã ${radius}`;
+          return {
+            d,
+            pin: {
+              businessId: b.id,
+              campaignId: best.id,
+              name: b.name,
+              category: b.category,
+              logoUrl: safeImageUrl(b.logoUrl),
+              address: b.address,
+              lat: b.lat,
+              lng: b.lng,
+              radiusM: best.radiusM,
+              distanceText,
+              amountText: e.amountText,
+              serviceText,
+              hoursText: `Tặng mã ${best.hoursFrom}–${best.hoursTo}`,
+              statusText,
+              a11yLabel: `${b.name}, voucher ${e.amountText} ${serviceText} dùng được cho chuyến này, ${distanceText.toLowerCase()}`,
+            } satisfies SponsorPinView,
+          };
+        })
+        .sort((a, b) => a.d - b.d)
+        .map((x) => x.pin);
+    },
+
+    /** Mã tự gắn theo cách ưu tiên người dùng chọn (Giảm nhiều nhất / Quán gần nhất / Sắp hết hạn). */
+    autoSelection(plan: Pick<TripPlan, 'evaluation'>, priority: OfferPriority): Selection {
+      return autoSelect(plan.evaluation.eligible, priority);
+    },
+
+    /** Danh sách màn Gắn voucher: mã đang gắn trước, rồi theo cách ưu tiên (mặc định giảm nhiều nhất). */
+    attachItems(plan: TripPlan, selection: Selection, priority: OfferPriority = 'discount'): AttachItemView[] {
+      return sortEligible(plan.evaluation.eligible, selection, priority).map((e) => {
         const attached = selection[e.service] === e.offer.refId;
         const busy = !attached && !!selection[e.service];
         return {
@@ -798,13 +1147,24 @@ export function createUserService(db: Db) {
     },
 
     /** Người dùng nhập mã khác. Trả về refId nếu khớp mã đã biết và hợp chuyến. */
-    async addCustomCode(plan: TripPlan, input: string): Promise<{ matched: EligibleOffer | null; message: string }> {
+    /**
+     * Mã người dùng tự nhập: khớp mã Frego biết → gắn; biết nhưng không hợp → nói lý do; chưa biết → `unknown`
+     * (giữ trong danh sách "Mã bạn nhập", không tính vào giá vì chưa biết mức giảm — 27/11/2026).
+     */
+    async addCustomCode(
+      plan: TripPlan,
+      input: string,
+    ): Promise<{ matched: EligibleOffer | null; message: string; unknown: string | null }> {
       const code = input.trim().toUpperCase();
       const hit = plan.evaluation.eligible.find((e) => e.offer.code.toUpperCase() === code);
-      if (hit) return { matched: hit, message: `Đã gắn ${hit.offer.code} cho ${hit.serviceText}.` };
+      if (hit) return { matched: hit, message: `Đã gắn ${hit.offer.code} cho ${hit.serviceText}.`, unknown: null };
       const bad = plan.evaluation.ineligible.find((e) => e.offer.code.toUpperCase() === code);
-      if (bad) return { matched: null, message: `${bad.offer.code} không hợp chuyến này: ${bad.line.split(' · ')[1]}.` };
-      return { matched: null, message: 'Đã thêm. Frego kiểm tra điều kiện của mã rồi mới tính vào giá.' };
+      if (bad) return { matched: null, message: `${bad.offer.code} không hợp chuyến này: ${bad.line.split(' · ')[1]}.`, unknown: null };
+      return {
+        matched: null,
+        message: `Frego chưa có thông tin mã ${code} nên chưa trừ vào giá so sánh. Bạn vẫn nhập được mã này trong app hãng khi đặt xe.`,
+        unknown: code,
+      };
     },
 
     async compare(plan: TripPlan, selection: Selection, vehicleClass: VehicleClass): Promise<ComparisonView> {
@@ -876,6 +1236,85 @@ export function createUserService(db: Db) {
           ? [`${provider.name} mở sẵn điểm đến`, ', bạn chỉ cần nhập mã.']
           : [`${provider.name} chưa tự điền điểm đến,`, ' địa chỉ đã được chép sẵn để bạn dán.'],
       };
+    },
+
+    /**
+     * Nội dung popup quảng cáo cho hãng vừa chọn ở So giá, hoặc null nếu mã gắn ở hãng đó không phải của quán tài trợ
+     * (mã Frego, mã công khai, không có mã) → đi thẳng sang màn Mở app.
+     */
+    async sponsorAd(plan: Pick<TripPlan, 'dest'>, row: PriceRow): Promise<SponsorAdView | null> {
+      const e = row.attached;
+      if (!e || e.offer.source !== 'sponsor' || !e.offer.campaignId) return null;
+      const camp = await db.get('campaigns_public', e.offer.campaignId);
+      const b = camp ? await db.get('businesses_public', camp.businessId) : null;
+      if (!camp || !b) return null;
+      const [banner] = await db.list('ad_banners_public', { where: { businessId: b.id }, limit: 1 });
+      const d = distanceM(plan.dest, b);
+      const wd = vnParts(db.now()).weekday;
+      const today = wd === 0 ? b.openHours.sunday : wd === 6 ? b.openHours.saturday : b.openHours.weekdays;
+      return {
+        campaignId: camp.id,
+        businessId: b.id,
+        name: b.name,
+        category: b.category,
+        logoUrl: safeImageUrl(b.logoUrl),
+        industry: b.industry,
+        address: b.address,
+        distanceText: d < 25 ? 'Ngay tại điểm đến' : `Cách điểm đến ${formatMeters(roundMeters(d))}`,
+        hoursText: today ? `Mở cửa hôm nay ${today}` : '',
+        giftText: `Voucher ${formatDiscount(e.discount)} ${serviceShortLabel(camp.providerId, camp.vehicleClass)} chuyến này là quà của ${b.name}.`,
+        banner: banner ? { imageUrl: banner.imageUrl, title: banner.title, body: banner.body } : null,
+        ctaLabel: 'Nhận mã giảm giá',
+      };
+    },
+
+    /**
+     * Ví › Tại quán (chốt 27/11/2026): ưu đãi trên banner của quán mà người dùng đã xem trong ngày (sau khi chọn hãng có mã
+     * của quán). Banner hay ghi "đưa màn hình này…" nên phải mở lại được khi tới quán. Lấy từ chuyến có `adViewedAt`.
+     */
+    async shopOffers(): Promise<ShopOfferView[]> {
+      const uid = me();
+      const today = formatDate(db.now());
+      const trips = (await db.list('trips', { where: { userId: uid }, order: { column: 'createdAt', ascending: false } })).filter(
+        (t) => t.adViewedAt && formatDate(t.adViewedAt) === today,
+      );
+      const out: ShopOfferView[] = [];
+      const seen = new Set<string>();
+      for (const t of trips) {
+        const code = t.attached.find((c) => c.service === t.chosenService);
+        if (!code?.refId.startsWith('uv:')) continue;
+        const v = await db.get('user_vouchers', code.refId.slice(3));
+        const camp = v?.campaignId ? await db.get('campaigns_public', v.campaignId) : null;
+        const b = camp ? await db.get('businesses_public', camp.businessId) : null;
+        if (!b || seen.has(b.id)) continue;
+        const [banner] = await db.list('ad_banners_public', { where: { businessId: b.id }, limit: 1 });
+        if (!banner) continue;
+        seen.add(b.id);
+        out.push({
+          tripId: t.id,
+          businessId: b.id,
+          name: b.name,
+          address: b.address,
+          category: b.category,
+          logoUrl: safeImageUrl(b.logoUrl),
+          title: banner.title,
+          body: banner.body,
+          imageUrl: banner.imageUrl,
+          whenText: `Xem lúc ${formatTime(t.adViewedAt!)} hôm nay · dùng trong ngày`,
+          lat: b.lat,
+          lng: b.lng,
+        });
+      }
+      return out;
+    },
+
+    /** Đã hiện popup quảng cáo cho chuyến: ghi 1 lượt xem (mỗi chuyến 1 lần; lỗi mạng thì bỏ qua, không chặn luồng). */
+    async recordAdView(tripId: string): Promise<boolean> {
+      try {
+        return (await db.rpc('record_ad_view', { tripId })).counted;
+      } catch {
+        return false;
+      }
     },
 
     /** Ghi lần so giá mà không mở app hãng nào ("Chỉ xem giá"). */
@@ -1174,8 +1613,9 @@ export function createUserService(db: Db) {
       return {
         cards: partners.filter((p) => p.kind === 'bank').map(row),
         wallets: partners.filter((p) => p.kind === 'wallet').map(row),
-        apps: partners.filter((p) => p.kind === 'app' || p.kind === 'email').map(row),
-        count: linked.length,
+        // Gmail có hàng riêng (getGmailStatus); hàng Grab/Be/Green SM là "Đã cài app", chỉ ghi nhận để ưu tiên mã.
+        apps: partners.filter((p) => p.kind === 'app').map(row),
+        count: linked.filter((id) => id !== 'gmail').length,
       };
     },
 
@@ -1190,6 +1630,84 @@ export function createUserService(db: Db) {
       const uid = me();
       const existing = await db.list('linked_accounts', { where: { userId: uid, partnerId } });
       for (const e of existing) await db.remove('linked_accounts', e.id);
+    },
+
+    /* ───── Gmail: tự lấy giá từ biên nhận ───── */
+    // Supabase: liên kết / đồng bộ / gỡ chạy ở máy chủ web (apps/web/src/app/api/gmail), app chỉ đọc trạng thái ở đây.
+    // DEMO: liên kết giả lập (ghi rõ là bản thử), đồng bộ tạo một biên nhận mẫu cho chuyến gần nhất rồi chạy đúng
+    // parseReceipt + RPC record_receipt như máy chủ.
+
+    async getGmailStatus(): Promise<GmailStatusView> {
+      const uid = me();
+      const [conns, receipts] = await Promise.all([
+        db.list('gmail_connections_public', { where: { userId: uid } }),
+        db.list('gmail_receipts', { where: { userId: uid } }),
+      ]);
+      const c = conns[0] ?? null;
+      return {
+        linked: !!c,
+        demo: !!c?.demo,
+        email: c?.email ?? null,
+        lastSyncText: c?.lastSyncAt ? `Đồng bộ lần cuối ${formatTime(c.lastSyncAt)}, ${formatDayMonth(c.lastSyncAt)}` : null,
+        matchedCount: receipts.filter((r) => r.status === 'matched').length,
+        error: c?.status === 'error' ? (c.lastError ?? 'Cần liên kết lại Gmail.') : null,
+      };
+    },
+
+    async demoLinkGmail() {
+      if (db.mode !== 'demo') throw new Error('Chỉ dùng ở chế độ DEMO');
+      const uid = me();
+      const existing = await db.list('gmail_connections', { where: { userId: uid } });
+      if (existing.length) return existing[0]!;
+      return db.insert('gmail_connections', {
+        userId: uid,
+        email: 'hopthu.demo@gmail.com',
+        status: 'active',
+        connectedAt: nowIso(),
+        lastSyncAt: null,
+        lastError: null,
+        demo: true,
+      });
+    },
+
+    async demoUnlinkGmail() {
+      if (db.mode !== 'demo') throw new Error('Chỉ dùng ở chế độ DEMO');
+      const uid = me();
+      const existing = await db.list('gmail_connections', { where: { userId: uid } });
+      for (const e of existing) await db.remove('gmail_connections', e.userId);
+    },
+
+    async demoSyncGmail(): Promise<GmailSyncResult> {
+      if (db.mode !== 'demo') throw new Error('Chỉ dùng ở chế độ DEMO');
+      const uid = me();
+      // Chuyến mở app hãng gần nhất chưa có số tiền (đúng chuyến mà record_receipt sẽ khớp).
+      const trips = await db.list('trips', { where: { userId: uid } });
+      const trip =
+        trips
+          .filter((t) => t.chosenService && t.openedAt && t.paidAmount === null)
+          .sort((a, b) => (a.openedAt! < b.openedAt! ? 1 : -1))[0] ?? null;
+      const result: GmailSyncResult = { checked: 0, matched: 0, pointsAwarded: 0, held: null };
+      if (trip) {
+        const parsed = parseReceipt(demoReceiptEmail(trip, db.now()));
+        if (parsed) {
+          result.checked = 1;
+          const r = await db.rpc('record_receipt', {
+            messageId: `demo-${trip.id}`,
+            providerId: parsed.providerId,
+            paidAmount: parsed.total,
+            receivedAt: parsed.receivedAt,
+            tripAt: parsed.tripAt,
+            pickup: parsed.pickup,
+            dropoff: parsed.dropoff,
+            promoCode: parsed.promoCode,
+          });
+          if (r.status === 'matched' && !r.duplicate) result.matched = 1;
+          result.pointsAwarded = r.pointsAwarded;
+          result.held = r.held;
+        }
+      }
+      await db.update('gmail_connections', uid, { lastSyncAt: nowIso() });
+      return result;
     },
 
     /* ───── Thông báo ───── */
@@ -1238,6 +1756,33 @@ export function createUserService(db: Db) {
 }
 
 export type UserService = ReturnType<typeof createUserService>;
+
+/** DEMO: thư biên nhận mẫu (giả lập) cho chuyến đã mở app hãng — giá giữa khoảng ước tính, gửi 25 phút sau khi mở app. */
+function demoReceiptEmail(trip: Trip, now: Date): ReceiptEmail {
+  const { providerId, vehicleClass } = parseServiceKey(trip.chosenService!);
+  const sender = { grab: 'Grab <no-reply@grab.com>', be: 'be <hotro@be.com.vn>', gsm: 'Xanh SM <no-reply@xanhsm.com>' }[providerId];
+  const opened = new Date(trip.openedAt!).getTime();
+  const at = new Date(Math.min(opened + 25 * 60_000, now.getTime()));
+  const lo = trip.estimateLow ?? 30_000;
+  const hi = trip.estimateHigh ?? lo;
+  const total = Math.round((lo + hi) / 2 / 1000) * 1000;
+  const code = trip.attached.find((c) => c.service === trip.chosenService)?.code ?? null;
+  return {
+    from: sender,
+    subject: `[Bản thử DEMO] Biên nhận chuyến đi ${serviceFullLabel(providerId, vehicleClass)}`,
+    date: at.toISOString(),
+    text: [
+      'Cảm ơn bạn đã đi cùng chúng tôi',
+      `Thời gian: ${formatTime(at)} ${formatDate(at)}`,
+      `Điểm đón: ${trip.originLabel}`,
+      `Điểm đến: ${trip.destLabel}`,
+      code ? `Mã khuyến mãi: ${code}` : '',
+      `Tổng cộng: ${formatVnd(total)}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  };
+}
 
 /** Link mở app hãng. Grab nhận điểm đến qua tham số; Be, Green SM chỉ mở app. */
 export function providerDeepLink(providerId: ProviderId, dest: Pick<Place, 'name' | 'lat' | 'lng'>): string {

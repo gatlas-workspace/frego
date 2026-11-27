@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useRef, type ReactNode } from 'react';
+import { PanResponder, Pressable, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from './Text';
 import { colors, radius, shadow } from '@/theme/tokens';
@@ -31,19 +31,66 @@ export interface SheetProps {
   /** Phần tử cố định dưới đáy tấm (VD BottomBar). */
   footer?: ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** Tấm đang thu gọn (chỉ còn tiêu đề + footer) để lộ bản đồ. Truyền cùng `onCollapsedChange` để bật kéo/chạm thanh kéo. */
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+}
+
+/** Kéo quá ngưỡng này (px) thì đổi trạng thái thu gọn/mở rộng. */
+const DRAG_THRESHOLD = 40;
+
+/** Thanh kéo bấm được: chạm để đổi, kéo xuống để thu gọn, kéo lên để mở rộng. */
+function SheetToggle({ collapsed, onChange }: { collapsed: boolean; onChange: (collapsed: boolean) => void }) {
+  const state = useRef({ collapsed, onChange });
+  state.current = { collapsed, onChange };
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderRelease: (_, g) => {
+        const s = state.current;
+        if (g.dy > DRAG_THRESHOLD && !s.collapsed) s.onChange(true);
+        else if (g.dy < -DRAG_THRESHOLD && s.collapsed) s.onChange(false);
+      },
+    }),
+  ).current;
+  return (
+    <View {...pan.panHandlers} style={{ marginTop: -10, marginBottom: -12, marginHorizontal: -20 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={collapsed ? 'Mở rộng chi tiết chuyến' : 'Thu gọn để xem bản đồ'}
+        accessibilityState={{ expanded: !collapsed }}
+        onPress={() => onChange(!collapsed)}
+        style={{ minHeight: 44, justifyContent: 'center' }}
+      >
+        <SheetHandle />
+      </Pressable>
+    </View>
+  );
 }
 
 /**
  * Tấm nền xám bo 28 trồi lên đè 28px lên bản đồ (KetQua, ChonHang).
  * Đặt ngay sau `<MapRoute height={250} />` trong một cột `flex: 1`.
  */
-export function Sheet({ title, subtitle, header, children, scroll = true, contentStyle, footer, style }: SheetProps) {
+export function Sheet({
+  title,
+  subtitle,
+  header,
+  children,
+  scroll = true,
+  contentStyle,
+  footer,
+  style,
+  collapsed = false,
+  onCollapsedChange,
+}: SheetProps) {
   const content = [{ paddingTop: 4, paddingHorizontal: 20, paddingBottom: 20, gap: 16 }, contentStyle];
   return (
     <View
       style={[
         {
-          flex: 1,
+          // Thu gọn: cao vừa tiêu đề + footer (không dùng flex: 0 vì web hiểu thành cao 0).
+          ...(collapsed ? { flexGrow: 0, flexShrink: 0 } : { flex: 1 }),
           minHeight: 0,
           marginTop: -28,
           backgroundColor: colors.bg,
@@ -55,7 +102,7 @@ export function Sheet({ title, subtitle, header, children, scroll = true, conten
       ]}
     >
       <View style={{ paddingTop: 10, paddingHorizontal: 20, paddingBottom: 12, gap: 12 }}>
-        <SheetHandle />
+        {onCollapsedChange ? <SheetToggle collapsed={collapsed} onChange={onCollapsedChange} /> : <SheetHandle />}
         {title || subtitle ? (
           <View style={{ gap: 4 }}>
             {title ? (
@@ -72,7 +119,7 @@ export function Sheet({ title, subtitle, header, children, scroll = true, conten
         ) : null}
         {header}
       </View>
-      {scroll ? (
+      {collapsed ? null : scroll ? (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={content} showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>

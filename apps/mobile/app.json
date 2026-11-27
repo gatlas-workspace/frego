@@ -59,6 +59,12 @@
           "photosPermission": "Chọn ảnh đại diện cho tài khoản Frego.",
           "cameraPermission": "Chụp ảnh đại diện cho tài khoản Frego."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Frego dùng vị trí khi bạn đang mở app để điền điểm đón và tính quãng đường."
+        }
       ]
     ],
     "experiments": {

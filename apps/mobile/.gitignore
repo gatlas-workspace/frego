@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Worker MapLibre chép từ node_modules (scripts/copy-map-worker.mjs)
+public/vendor/

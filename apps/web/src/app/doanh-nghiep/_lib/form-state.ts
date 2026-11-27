@@ -6,6 +6,8 @@ export type FormState = {
   fieldErrors?: Record<string, string>;
   /** Thông tin thêm cho màn hình (vd. cảnh báo sau khi gửi). */
   note?: string;
+  /** Dữ liệu thêm cho bước kế tiếp (vd. id doanh nghiệp vừa đăng ký + tọa độ gợi ý để ghim bản đồ). */
+  data?: Record<string, string | number>;
   /** Mốc thời gian để phân biệt hai lần gửi liên tiếp. */
   at?: number;
 };

@@ -11,3 +11,17 @@ export async function setTicketStatusAction(formData: FormData) {
   await svc.setTicketStatus(id, status);
   revalidatePath('/quan-tri/ho-tro');
 }
+
+export type ReplyState = { ok: boolean; message: string; at: number } | null;
+
+/** Trả lời yêu cầu hỗ trợ (lưu vào ticket_messages, người gửi đọc được). */
+export async function replyTicketAction(_prev: ReplyState, formData: FormData): Promise<ReplyState> {
+  const { svc } = await adminOpsService();
+  try {
+    const r = await svc.replyTicket(String(formData.get('id') ?? ''), String(formData.get('body') ?? ''));
+    revalidatePath('/quan-tri/ho-tro');
+    return { ok: true, message: r.message, at: Date.now() };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Chưa gửi được trả lời. Thử lại.', at: Date.now() };
+  }
+}

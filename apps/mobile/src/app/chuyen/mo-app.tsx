@@ -3,11 +3,12 @@ import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { PROVIDERS } from '@frego/core';
-import { BackButton, Button, InfoNote, MapRoute, ModalSheet, T, VehicleTile } from '@/components/ui';
+import { BackButton, Button, InfoNote, ModalSheet, T, VehicleTile } from '@/components/ui';
 import { CodeBox } from '@/components/screens/flow/CodeBox';
 import { noBreak } from '@/components/screens/flow/noBreak';
 import { copyText, openProviderApp, scheduleCodeUsed } from '@/components/screens/flow/openProviderApp';
 import { Steps, Strong } from '@/components/screens/flow/Steps';
+import { TripMapBackdrop } from '@/components/screens/flow/TripMapBackdrop';
 import { useApi } from '@/lib/api';
 import { usePush } from '@/lib/push';
 import { useTripFlow } from '@/lib/trip-flow';
@@ -16,7 +17,7 @@ import { colors } from '@/theme/tokens';
 export default function OpenAppScreen() {
   const { svc } = useApi();
   const { show } = usePush();
-  const { plan, openView: view } = useTripFlow();
+  const { plan, openView: view, sponsorAd } = useTripFlow();
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -47,7 +48,7 @@ export default function OpenAppScreen() {
 
   return (
     <ModalSheet
-      backdrop={<MapRoute height="100%" labels={false} />}
+      backdrop={<TripMapBackdrop vehicleClass={view.vehicleClass} />}
       onDismiss={close}
       dismissLabel="Đóng, quay lại chọn hãng xe"
       gap={18}
@@ -118,6 +119,15 @@ export default function OpenAppScreen() {
           ),
         ]}
       />
+
+      {sponsorAd?.banner ? (
+        <InfoNote
+          tone="tint"
+          icon="check"
+          title={`Đã lưu ưu đãi của ${sponsorAd.name}`}
+          text="Mở ở Ví › Tại quán khi tới quán để đưa nhân viên."
+        />
+      ) : null}
 
       <Button label={`Mở app ${name}`} icon="external" onPress={openApp} disabled={opening} />
       <T size={13} lineHeight={19} color={colors.muted} align="center">

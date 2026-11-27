@@ -5,7 +5,7 @@ import { adminService } from '@/lib/server/data';
 export type ReviewState = { error: string; field?: 'reason'; at: number } | null;
 
 /**
- * Duyệt / từ chối chiến dịch hoặc hồ sơ doanh nghiệp. Từ chối cần lý do (gửi cho doanh nghiệp).
+ * Duyệt / từ chối chiến dịch, hồ sơ doanh nghiệp hoặc banner quảng cáo. Từ chối cần lý do (gửi cho doanh nghiệp).
  * Làm mới cả khung quản trị để số chờ duyệt ở thanh bên giảm theo.
  */
 export async function reviewAction(_prev: ReviewState, formData: FormData): Promise<ReviewState> {
@@ -22,8 +22,11 @@ export async function reviewAction(_prev: ReviewState, formData: FormData): Prom
       if (decision === 'approve') await svc.approveCampaign(id);
       else await svc.rejectCampaign(id, reason);
     } else if (kind === 'business') {
-      if (decision === 'approve') await svc.approveBusiness(id);
+      if (decision === 'approve') await svc.approveBusiness(id, { confirmMissing: formData.get('confirmMissing') === '1' });
       else await svc.rejectBusiness(id, reason);
+    } else if (kind === 'banner') {
+      if (decision === 'approve') await svc.approveBanner(id);
+      else await svc.rejectBanner(id, reason);
     } else {
       return { error: 'Không rõ hồ sơ cần duyệt.', at: Date.now() };
     }

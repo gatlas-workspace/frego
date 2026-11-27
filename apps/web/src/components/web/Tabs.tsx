@@ -44,8 +44,8 @@ export type TabsProps = {
   /** Có onChange → dùng nút thay liên kết (chỉ trong Client Component). */
   onChange?: (key: string) => void;
   /**
-   * WebTabs toolbar. true = cụm "Lọc · Sắp xếp · Tìm" như thiết kế (trang trí, aria-hidden);
-   * truyền ReactNode (vd. các <TabsTool>) để có công cụ thật.
+   * WebTabs toolbar: truyền ReactNode (vd. các <TabsTool>) để có công cụ thật. true = không hiện gì
+   * (cụm "Lọc · Sắp xếp · Tìm" trang trí của thiết kế đã bỏ vì bấm không được).
    */
   toolbar?: boolean | ReactNode;
   className?: string;
@@ -141,26 +141,9 @@ export function Tabs({ items, active, label, param = 'tab', query, pathname, onC
           );
         })}
       </div>
-      {toolbar ? (
-        <div className="ml-auto flex flex-none items-center gap-0.5 pb-[3px] pl-2">
-          {toolbar === true ? (
-            <span aria-hidden="true" className="flex items-center gap-0.5 max-[600px]:hidden">
-              <span className="flex h-7 items-center gap-1 rounded-ctl px-1.5 text-[14px] text-ink-2">
-                <WebIcon name="filter" size={16} />
-                Lọc
-              </span>
-              <span className="flex h-7 items-center gap-1 rounded-ctl px-1.5 text-[14px] text-ink-2">
-                <WebIcon name="sort" size={16} />
-                Sắp xếp
-              </span>
-              <span className="flex h-7 items-center rounded-ctl px-1.5 text-ink-2">
-                <WebIcon name="search" size={16} />
-              </span>
-            </span>
-          ) : (
-            toolbar
-          )}
-        </div>
+      {/* toolbar === true trước đây là cụm "Lọc · Sắp xếp · Tìm" chỉ để trang trí (bấm không được) → bỏ. Chỉ hiện công cụ thật. */}
+      {toolbar && toolbar !== true ? (
+        <div className="ml-auto flex flex-none items-center gap-0.5 pb-[3px] pl-2">{toolbar}</div>
       ) : null}
     </div>
   );
