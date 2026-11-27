@@ -32,22 +32,22 @@ export default function ReportPriceScreen() {
   const { svc } = useApi();
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
-  const [tapDone, setTapDone] = useState<number | null>(null);
-  const [amountDone, setAmountDone] = useState<number | null>(null);
+  const [tapDone, setTapDone] = useState<string | null>(null);
+  const [amountDone, setAmountDone] = useState<string | null>(null);
 
   const trip = useQuery({ queryKey: ['trip', tripId], queryFn: () => svc.getTrip(String(tripId)), enabled: !!tripId });
 
   const tap = useMutation({
     mutationFn: (verdict: PriceVerdict) => svc.reportPrice(String(tripId), { verdict }),
     onSuccess: (r) => {
-      setTapDone(r.pointsAwarded);
+      setTapDone(r.held ?? `Cảm ơn bạn! Đã cộng ${r.pointsAwarded} điểm.`);
       refreshAll();
     },
   });
   const sendAmount = useMutation({
     mutationFn: (paidAmount: number) => svc.reportPrice(String(tripId), { paidAmount }),
     onSuccess: (r) => {
-      setAmountDone(r.pointsAwarded);
+      setAmountDone(r.pointsAwarded > 0 ? `Đã nhận số tiền, cộng ${r.pointsAwarded} điểm.` : (r.held ?? 'Đã nhận số tiền.'));
       refreshAll();
     },
   });
@@ -114,7 +114,7 @@ export default function ReportPriceScreen() {
 
         {hasEstimate ? (
           tapDone !== null ? (
-            <Done text={`Cảm ơn bạn! Đã cộng ${tapDone} điểm.`} />
+            <Done text={tapDone} />
           ) : verdict ? (
             <Done text={`Đã ghi nhận: giá thật ${VERDICT_TEXT[verdict]}.`} />
           ) : (
@@ -138,7 +138,7 @@ export default function ReportPriceScreen() {
         </T>
 
         {amountDone !== null ? (
-          <Done text={`Đã nhận số tiền, cộng ${amountDone} điểm.`} />
+          <Done text={amountDone} />
         ) : paid ? (
           <Done text={`Đã nhận số tiền ${formatVnd(paid)}.`} />
         ) : (

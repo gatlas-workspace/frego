@@ -129,4 +129,8 @@ export const POINTS_RULES = {
   receipt: 50,
   /** Nhân đôi khi báo giá ở nơi chưa có dữ liệu (VD Green SM). */
   noDataMultiplier: 2,
+  /** Tối đa mỗi người mỗi ngày; vượt thì giữ lại để kiểm tra. */
+  dailyCap: 300,
+  /** Số tiền nhập lệch quá 30% so với khoảng ước tính thì không cộng điểm. */
+  maxDeviation: 0.3,
 } as const;

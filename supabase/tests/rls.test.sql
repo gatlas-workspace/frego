@@ -13,13 +13,34 @@ begin
   perform set_config('request.jwt.claims', '', false);
 end $$;
 
+-- Số kỳ vọng tính từ dữ liệu (seed có thể thêm dòng), đọc bằng quyền chủ CSDL trước khi đóng vai.
+create temp table expect as select
+  (select count(*) from public.businesses where status in ('active', 'locked')) as biz_public,
+  (select count(*) from public.campaigns where status = 'active' and spent < budget and starts_at <= now() and ends_at > now()) as offering,
+  (select count(*) from public.public_codes where status = 'live') as live_codes,
+  (select count(*) from public.places) as places,
+  (select count(*) from public.profiles) as profiles,
+  (select count(*) from public.businesses) as businesses,
+  (select count(*) from public.user_vouchers where user_id = '00000000-0000-4000-8000-000000000001') as ma_vouchers,
+  (select count(*) from public.trips where user_id = '00000000-0000-4000-8000-000000000001') as ma_trips,
+  (select count(*) from public.notifications where user_id = '00000000-0000-4000-8000-000000000001' and read_at is null) as ma_unread,
+  (select count(*) from public.campaigns where business_id = 'biz-cafe-may') as may_campaigns,
+  (select count(*) from public.wallet_transactions where business_id = 'biz-cafe-may') as may_tx,
+  (select wallet_balance from public.businesses where id = 'biz-cafe-may') as may_balance,
+  (select amount from public.wallet_transactions where id = 'wt-2') as wt2_amount,
+  (select count(*) from public.audit_logs) as audit_before,
+  (select count(*) from public.trips where user_id = '00000000-0000-4000-8000-000000000002') as gh_trips,
+  (select count(*) from public.user_vouchers where user_id = '00000000-0000-4000-8000-000000000002') as gh_vouchers,
+  (select points from public.profiles where id = '00000000-0000-4000-8000-000000000002') as gh_points;
+grant select on expect to anon, authenticated;
+
 -- ───────────── Khách chưa đăng nhập (anon) ─────────────
 set role anon;
 do $$ begin
-  assert (select count(*) from public.places) = 11, 'anon đọc được danh mục địa điểm';
-  assert (select count(*) from public.businesses_public) = 6, 'anon thấy thông tin quán công khai';
-  assert (select count(*) from public.campaigns_public where offering) = 6, 'anon thấy 6 chiến dịch đang phát mã';
-  assert (select count(*) from public.public_codes) = 4, 'mã công khai bị ẩn không hiện';
+  assert (select count(*) from public.places) = (select places from expect), 'anon đọc được danh mục địa điểm';
+  assert (select count(*) from public.businesses_public) = (select biz_public from expect), 'anon thấy thông tin quán công khai';
+  assert (select count(*) from public.campaigns_public where offering) = (select offering from expect), 'anon thấy chiến dịch đang phát mã';
+  assert (select count(*) from public.public_codes) = (select live_codes from expect), 'mã công khai bị ẩn không hiện';
 end $$;
 do $$ begin
   perform 1 from public.profiles;
@@ -35,11 +56,11 @@ declare r jsonb; v_trip jsonb; n int;
 begin
   assert (select count(*) from public.profiles) = 1, 'chỉ thấy hồ sơ của mình';
   assert (select points from public.profiles) = 1250, 'điểm ban đầu 1.250';
-  assert (select count(*) from public.user_vouchers) = 2, 'ví có MAY7K2Q và FREGO10';
-  assert (select count(*) from public.trips) = 4, 'lịch sử 4 chuyến';
+  assert (select count(*) from public.user_vouchers) = (select ma_vouchers from expect), 'chỉ thấy ví của mình';
+  assert (select count(*) from public.trips) = (select ma_trips from expect), 'chỉ thấy chuyến của mình';
   assert (select count(*) from public.businesses) = 0, 'không đọc bảng businesses (ví, mã số thuế)';
   assert (select count(*) from public.redemptions) = 0, 'không đọc redemptions';
-  assert (select count(*) from public.notifications where read_at is null) = 3, '3 thông báo chưa đọc';
+  assert (select count(*) from public.notifications where read_at is null) = (select ma_unread from expect), 'thông báo chưa đọc của mình';
 
   -- Báo giá chuyến hôm nay: +10 một chạm, +50 nhập số tiền, không cộng lần hai.
   r := public.report_price('{"tripId":"trip-today","verdict":"within"}');
@@ -48,6 +69,10 @@ begin
   assert (r->>'points_awarded')::int = 50 and (r->>'points')::int = 1310, 'nhập số tiền +50 → 1.310';
   r := public.report_price('{"tripId":"trip-today","verdict":"cheaper"}');
   assert (r->>'points_awarded')::int = 0, 'không cộng điểm hai lần';
+
+  -- Chuyến khác: số tiền lệch quá 30% so với ước tính → không cộng điểm.
+  r := public.report_price('{"tripId":"trip-fri","paidAmount":24000}');
+  assert (r->>'points_awarded')::int = 0, 'chuyến đã báo giá không cộng lại';
 
   -- Đổi điểm.
   r := public.redeem_reward('{"rewardId":"rw-be"}');
@@ -64,6 +89,8 @@ begin
   assert r->'trip'->>'status' = 'code_used', 'mã đã dùng';
   assert (r->'notification'->>'title') like 'Mã NHO% vừa được dùng cho chuyến Grab', 'có thông báo nhắc báo giá';
   assert (select saved_amount from public.profiles) = 95000, 'cộng tiền đã tiết kiệm';
+  r := public.report_price(jsonb_build_object('tripId', v_trip->>'id', 'paidAmount', 90000));
+  assert (r->>'points_awarded')::int = 0 and r->>'held' like '%lệch hơn 30%%', 'lệch quá 30% thì giữ điểm';
 
   -- Bình chọn mã công khai.
   r := public.vote_public_code('{"publicCodeId":"pc-vpb","works":true}');
@@ -105,8 +132,9 @@ do $$ begin perform pg_temp.reset(); end $$;
 -- Người dùng khác không thấy dữ liệu của Minh Anh.
 do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000002'); end $$;
 do $$ begin
-  assert (select count(*) from public.trips) = 0, 'Gia Huy không thấy chuyến của Minh Anh';
-  assert (select count(*) from public.user_vouchers) = 0, 'Gia Huy không thấy ví của Minh Anh';
+  assert (select count(*) from public.trips) = (select gh_trips from expect), 'Gia Huy chỉ thấy chuyến của mình';
+  assert (select count(*) from public.trips where user_id <> auth.uid()) = 0, 'Gia Huy không thấy chuyến của Minh Anh';
+  assert (select count(*) from public.user_vouchers) = (select gh_vouchers from expect), 'Gia Huy chỉ thấy ví của mình';
   assert (select count(*) from public.profiles) = 1, 'Gia Huy chỉ thấy hồ sơ của mình';
 end $$;
 do $$ begin perform pg_temp.reset(); end $$;
@@ -117,12 +145,12 @@ do $$
 declare b jsonb;
 begin
   assert (select count(*) from public.businesses) = 1, 'chỉ thấy quán của mình';
-  assert (select wallet_balance from public.businesses) = 1180000, 'thấy số dư ví 1.180.000đ';
-  assert (select count(*) from public.campaigns) = 4, '4 chiến dịch của Cà phê Mây';
+  assert (select wallet_balance from public.businesses) = (select may_balance from expect), 'thấy số dư ví của quán';
+  assert (select count(*) from public.campaigns) = (select may_campaigns from expect), 'chỉ thấy chiến dịch của Cà phê Mây';
   assert (select count(*) from public.user_vouchers) = 0, 'không thấy người nhận mã';
   assert (select count(*) from public.profiles) = 1, 'không thấy hồ sơ người dùng khác';
   assert (select count(*) from public.redemptions) = 0, 'không thấy từng lượt dùng mã';
-  assert (select count(*) from public.wallet_transactions) = 2, 'thấy giao dịch ví của quán';
+  assert (select count(*) from public.wallet_transactions) = (select may_tx from expect), 'chỉ thấy giao dịch ví của quán';
 
   -- Tạm dừng rồi chạy tiếp chiến dịch đã duyệt; đổi ngân sách không cần duyệt lại.
   update public.campaigns set status = 'paused' where id = 'cp-may-chieu';
@@ -165,18 +193,18 @@ do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000a1'); end 
 do $$
 declare r jsonb;
 begin
-  assert (select count(*) from public.profiles) = 6, 'quản trị thấy mọi người dùng';
-  assert (select count(*) from public.businesses) = 6, 'quản trị thấy mọi doanh nghiệp';
+  assert (select count(*) from public.profiles) = (select profiles from expect), 'quản trị thấy mọi người dùng';
+  assert (select count(*) from public.businesses) >= (select businesses from expect), 'quản trị thấy mọi doanh nghiệp';
   assert (select count(*) from public.redemptions) >= 1, 'quản trị thấy lượt dùng mã';
   r := public.confirm_topup('{"transactionId":"wt-2"}');
-  assert (r->>'balance')::bigint = 6180000, 'khớp nạp 5.000.000đ → 6.180.000đ';
+  assert (r->>'balance')::bigint = (select may_balance + wt2_amount from expect), 'khớp nạp tiền cộng vào ví';
   update public.campaigns set status = 'active', approved_at = now() where id = 'cp-may-mon-moi';
   assert (select status from public.campaigns where id = 'cp-may-mon-moi') = 'active', 'quản trị duyệt chiến dịch';
   r := public.set_user_status('{"userId":"00000000-0000-4000-8000-000000000004","status":"locked","reason":"thử"}');
   assert r->>'status' = 'locked', 'tạm khóa người dùng';
   r := public.adjust_points('{"userId":"00000000-0000-4000-8000-000000000002","delta":50,"reason":"Bù điểm báo giá"}');
-  assert (r->>'points')::int = 690, 'điều chỉnh điểm';
-  assert (select count(*) from public.audit_logs) >= 4, 'thao tác quản trị được ghi nhật ký';
+  assert (r->>'points')::int = (select gh_points + 50 from expect), 'điều chỉnh điểm';
+  assert (select count(*) from public.audit_logs) >= (select audit_before + 3 from expect), 'thao tác quản trị được ghi nhật ký';
 end $$;
 do $$ begin perform pg_temp.reset(); end $$;
 

@@ -362,40 +362,66 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       const u = requireUser();
       const trip = tripOf(tripId, u);
       if (!trip.chosenService) throw new Error('Chuyến chưa chọn hãng');
+      if (profile(u).status === 'locked') throw new Error('Tài khoản đang tạm khóa');
       const svc = SERVICES[trip.chosenService];
       const label = serviceShortLabel(svc.providerId, svc.vehicleClass);
       const noData = !data.fare_tables.some(
         (f) => f.providerId === svc.providerId && f.vehicleClass === svc.vehicleClass && f.enabled,
       );
       const mult = noData ? POINTS_RULES.noDataMultiplier : 1;
-      let awarded = 0;
       const t = now().toISOString();
-      const alreadyTapped = trip.verdict !== null;
-      const alreadyAmount = trip.paidAmount !== null;
-      if (verdict && !alreadyTapped) {
+      // Giới hạn điểm báo giá mỗi ngày (giờ VN).
+      const dayOf = (iso: string) => Math.floor((new Date(iso).getTime() + 7 * 3600_000) / 86_400_000);
+      const today = dayOf(t);
+      let usedToday = data.points_ledger
+        .filter((e) => e.userId === u && e.tripId && e.delta > 0 && dayOf(e.createdAt) === today)
+        .reduce((sum, e) => sum + e.delta, 0);
+      let held: string | null = null;
+      const grant = (pts: number, reason: string) => {
+        const give = Math.max(0, Math.min(pts, POINTS_RULES.dailyCap - usedToday));
+        if (give < pts) held = `Đã đạt giới hạn ${POINTS_RULES.dailyCap} điểm hôm nay, phần còn lại được giữ để kiểm tra.`;
+        if (give > 0) {
+          ledger(u, give, reason, trip.id);
+          usedToday += give;
+        }
+        return give;
+      };
+      let awarded = 0;
+      let reported = false;
+      if (verdict && trip.verdict === null) {
         trip.verdict = verdict;
         trip.reportSource ??= 'tap';
-        const pts = POINTS_RULES.tap * mult;
-        ledger(u, pts, `Báo giá một chạm, ${label}`, trip.id);
-        awarded += pts;
+        awarded += grant(POINTS_RULES.tap * mult, `Báo giá một chạm, ${label}`);
+        reported = true;
       }
-      if (typeof paidAmount === 'number' && paidAmount > 0 && !alreadyAmount) {
+      if (typeof paidAmount === 'number' && paidAmount > 0 && trip.paidAmount === null) {
+        if (paidAmount > 5_000_000) throw new Error('Số tiền không hợp lệ');
         trip.paidAmount = paidAmount;
         trip.reportSource = 'amount';
-        if (!trip.verdict && trip.estimateLow !== null && trip.estimateHigh !== null) {
-          trip.verdict =
-            paidAmount < trip.estimateLow ? 'cheaper' : paidAmount > trip.estimateHigh ? 'pricier' : 'within';
+        reported = true;
+        const lo = trip.estimateLow;
+        const hi = trip.estimateHigh;
+        if (!trip.verdict && lo !== null && hi !== null) {
+          trip.verdict = paidAmount < lo ? 'cheaper' : paidAmount > hi ? 'pricier' : 'within';
         }
-        const pts = POINTS_RULES.amount * mult;
-        ledger(u, pts, `Nhập số tiền chuyến ${PROVIDERS[svc.providerId].name}, trả ${formatVnd(paidAmount)}`, trip.id);
-        awarded += pts;
+        const tooFar =
+          lo !== null && hi !== null &&
+          (paidAmount < lo * (1 - POINTS_RULES.maxDeviation) || paidAmount > hi * (1 + POINTS_RULES.maxDeviation));
+        if (tooFar) {
+          held = 'Số tiền lệch hơn 30% so với ước tính nên chưa cộng điểm. Frego sẽ kiểm tra lại.';
+        } else {
+          awarded += grant(
+            POINTS_RULES.amount * mult,
+            `Nhập số tiền chuyến ${PROVIDERS[svc.providerId].name}, trả ${formatVnd(paidAmount)}`,
+          );
+        }
       }
-      if (awarded > 0) {
+      if (reported) {
         trip.status = 'reported';
         trip.reportedAt = t;
         trip.pointsAwarded += awarded;
       }
-      return { trip, pointsAwarded: awarded, points: profile(u).points };
+      return { trip, pointsAwarded: awarded, points: profile(u).points, held };
     },
 
     redeem_reward({ rewardId }) {
@@ -503,6 +529,13 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       if (tx.status !== 'done') {
         tx.status = 'done';
         b.walletBalance += tx.amount;
+        data.audit_logs.push({
+          id: uid(),
+          actorName: 'Kế toán',
+          actorRole: 'accounting',
+          action: `Khớp nạp tiền ${formatVnd(tx.amount)}, ${b.name}`,
+          createdAt: now().toISOString(),
+        });
       }
       return { balance: b.walletBalance };
     },

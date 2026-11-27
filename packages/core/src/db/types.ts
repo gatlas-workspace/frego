@@ -48,7 +48,8 @@ export interface Rpcs {
   mark_code_used: { args: { tripId: string }; result: { trip: Trip; notification: AppNotification | null } };
   report_price: {
     args: { tripId: string; verdict?: PriceVerdict; paidAmount?: number };
-    result: { trip: Trip; pointsAwarded: number; points: number };
+    /** held: lý do điểm bị giữ (vượt giới hạn ngày, số tiền lệch quá 30%) hoặc null */
+    result: { trip: Trip; pointsAwarded: number; points: number; held: string | null };
   };
   redeem_reward: { args: { rewardId: string }; result: { voucher: UserVoucher; points: number } };
   vote_public_code: { args: { publicCodeId: string; works: boolean }; result: { ok: number; bad: number } };

@@ -96,6 +96,24 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     expect(again.pointsAwarded).toBe(0);
   });
 
+  it('số tiền lệch quá 30% không được cộng điểm; tối đa 300 điểm mỗi ngày', async () => {
+    const { svc, db } = setup();
+    const plan = await svc.planTrip('ben-thanh');
+    const cmp = await svc.compare(plan, plan.selection, 'bike');
+    const open = await svc.openProvider(plan, plan.selection, cmp.rows[0]);
+    await svc.simulateCodeUsed(open.trip.id);
+    const r = await svc.reportPrice(open.trip.id, { paidAmount: 90000 });
+    expect(r.pointsAwarded).toBe(0);
+    expect(r.held).toMatch(/lệch hơn 30%/);
+    // Đã đủ 300 điểm báo giá hôm nay → giữ lại.
+    await db.insert('points_ledger', { userId: DEMO_USER_ID, delta: 300, reason: 'test', tripId: 'trip-yday-am', createdAt: db.now().toISOString() });
+    const open2 = await svc.openProvider(plan, plan.selection, cmp.rows[1]);
+    await svc.simulateCodeUsed(open2.trip.id);
+    const r2 = await svc.reportPrice(open2.trip.id, { verdict: 'pricier' });
+    expect(r2.pointsAwarded).toBe(0);
+    expect(r2.held).toMatch(/giới hạn 300 điểm/);
+  });
+
   it('ưu đãi chiến dịch được phát mã riêng khi mở app hãng', async () => {
     const { svc, db } = setup();
     const plan = await svc.planTrip('ben-thanh');
