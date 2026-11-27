@@ -218,13 +218,13 @@ insert into public.campaign_events (id, campaign_id, at, text) values
 on conflict (id) do update set campaign_id = excluded.campaign_id, at = excluded.at, text = excluded.text;
 
 -- frego_codes (5)
-insert into public.frego_codes (id, code, kind, provider_id, vehicle_class, amount, title, valid_days, issued_count, used_count, active) values
-  ('fc-frego10', 'FREGO10', 'welcome', 'be', 'bike', 10000, 'Quà chào mừng', 30, 2120, 1640, true),
-  ('fc-r-be', 'FRBE10', 'reward', 'be', 'bike', 10000, 'Đổi 500 điểm', 30, 240, 190, true),
-  ('fc-r-gsm', 'FRGS15', 'reward', 'gsm', 'bike', 15000, 'Đổi 1.000 điểm', 30, 82, 51, true),
-  ('fc-r-grab', 'FRGR20', 'reward', 'grab', 'car4', 20000, 'Đổi 1.500 điểm', 30, 42, 33, true),
-  ('fc-fregomoi', 'FREGOMOI', 'promo', 'grab', 'bike', 15000, 'Chuyến đầu', 30, 0, 0, false)
-on conflict (id) do update set code = excluded.code, kind = excluded.kind, provider_id = excluded.provider_id, vehicle_class = excluded.vehicle_class, amount = excluded.amount, title = excluded.title, valid_days = excluded.valid_days, issued_count = excluded.issued_count, used_count = excluded.used_count, active = excluded.active;
+insert into public.frego_codes (id, code, kind, provider_id, vehicle_class, amount, title, valid_days, quota, issued_count, used_count, active) values
+  ('fc-welcome', 'FREGO20', 'welcome', 'be', 'bike', 20000, 'Quà chào mừng', 30, 50, 46, 31, true),
+  ('fc-r-be', 'FRBE10', 'reward', 'be', 'bike', 10000, 'Đổi 500 điểm', 30, null, 240, 190, true),
+  ('fc-r-gsm', 'FRGS15', 'reward', 'gsm', 'bike', 15000, 'Đổi 1.000 điểm', 30, null, 82, 51, true),
+  ('fc-r-grab', 'FRGR20', 'reward', 'grab', 'car4', 20000, 'Đổi 1.500 điểm', 30, null, 42, 33, true),
+  ('fc-fregomoi', 'FREGOMOI', 'promo', 'grab', 'bike', 15000, 'Chuyến đầu', 30, null, 0, 0, false)
+on conflict (id) do update set code = excluded.code, kind = excluded.kind, provider_id = excluded.provider_id, vehicle_class = excluded.vehicle_class, amount = excluded.amount, title = excluded.title, valid_days = excluded.valid_days, quota = excluded.quota, issued_count = excluded.issued_count, used_count = excluded.used_count, active = excluded.active;
 
 -- rewards (3)
 insert into public.rewards (id, provider_id, vehicle_class, amount, cost, frego_code_id, redeemed_count, active) values
@@ -236,7 +236,7 @@ on conflict (id) do update set provider_id = excluded.provider_id, vehicle_class
 -- user_vouchers (2)
 insert into public.user_vouchers (id, user_id, source, campaign_id, frego_code_id, code, provider_id, vehicle_class, amount, note, reasons, status, issued_at, expires_at, used_at, trip_id) values
   ('uv-may7k2q', '00000000-0000-4000-8000-000000000001', 'sponsor', 'cp-may-chieu', null, 'MAY7K2Q', 'grab', 'car4', 20000, 'Tặng vì bạn hay đến khu Chợ Bến Thành', '{"4 chuyến có điểm đến quanh Chợ Bến Thành trong 30 ngày qua.","Bạn hay đi vào buổi chiều, lúc quán đang mở cửa."}', 'active', '2026-11-22T08:20:00.000Z', '2026-11-30T16:59:00.000Z', null, null),
-  ('uv-frego10', '00000000-0000-4000-8000-000000000001', 'frego', null, 'fc-frego10', 'FREGO10', 'be', 'bike', 10000, 'Quà chào mừng khi bạn tham gia Frego', '{}', 'active', '2026-11-01T01:00:00.000Z', '2026-11-30T16:59:00.000Z', null, null)
+  ('uv-welcome', '00000000-0000-4000-8000-000000000001', 'frego', null, 'fc-welcome', 'FREGO20', 'be', 'bike', 20000, 'Quà chào mừng khi bạn tham gia Frego', '{}', 'active', '2026-11-01T01:00:00.000Z', '2026-11-30T16:59:00.000Z', null, null)
 on conflict (id) do update set user_id = excluded.user_id, source = excluded.source, campaign_id = excluded.campaign_id, frego_code_id = excluded.frego_code_id, code = excluded.code, provider_id = excluded.provider_id, vehicle_class = excluded.vehicle_class, amount = excluded.amount, note = excluded.note, reasons = excluded.reasons, status = excluded.status, issued_at = excluded.issued_at, expires_at = excluded.expires_at, used_at = excluded.used_at, trip_id = excluded.trip_id;
 
 -- public_codes (6)
@@ -251,7 +251,7 @@ on conflict (id) do update set provider_id = excluded.provider_id, vehicle_class
 
 -- trips (7)
 insert into public.trips (user_id, origin_label, origin_place_id, distance_km, duration_min, attached, chosen_service, estimate_low, estimate_high, compared_count, status, verdict, paid_amount, report_source, points_awarded, opened_at, code_used_at, reported_at, id, dest_place_id, dest_label, created_at) values
-  ('00000000-0000-4000-8000-000000000001', 'Landmark 81', 'landmark81', 5.8, 20, '[{"service":"be-bike","source":"frego","refId":"uv:uv-frego10","code":"FREGO10","label":"FREGO10","amount":10000}]', 'be-bike', 21000, 26000, 3, 'code_used', null, null, null, 0, '2026-11-22T10:41:00.000Z', '2026-11-22T11:05:00.000Z', null, 'trip-today', 'ben-thanh', 'Chợ Bến Thành', '2026-11-22T10:40:00.000Z'),
+  ('00000000-0000-4000-8000-000000000001', 'Landmark 81', 'landmark81', 5.8, 20, '[{"service":"be-bike","source":"frego","refId":"uv:uv-welcome","code":"FREGO20","label":"FREGO20","amount":20000}]', 'be-bike', 11000, 16000, 3, 'code_used', null, null, null, 0, '2026-11-22T10:41:00.000Z', '2026-11-22T11:05:00.000Z', null, 'trip-today', 'ben-thanh', 'Chợ Bến Thành', '2026-11-22T10:40:00.000Z'),
   ('00000000-0000-4000-8000-000000000001', 'Phố đi bộ Nguyễn Huệ', 'nguyen-hue', 2.1, 9, '{}', null, null, null, 3, 'compared', null, null, null, 0, null, null, null, 'trip-yday-eve', 'ho-con-rua', 'Hồ Con Rùa', '2026-11-21T12:05:00.000Z'),
   ('00000000-0000-4000-8000-000000000001', 'Nhà', 'nha-minh-anh', 5.8, 20, '{}', 'grab-car4', 75000, 86000, 3, 'reported', 'within', 78000, 'receipt', 50, '2026-11-21T01:16:00.000Z', '2026-11-21T01:40:00.000Z', '2026-11-21T01:52:00.000Z', 'trip-yday-am', 'cty-minh-anh', 'Công ty', '2026-11-21T01:15:00.000Z'),
   ('00000000-0000-4000-8000-000000000001', 'Chợ Tân Định', 'cho-tan-dinh', 3.4, 13, '[{"service":"be-bike","source":"sponsor","refId":"cp:cp-banh-moc","code":"MOC4H8T","label":"Tiệm bánh Mộc","amount":10000}]', 'be-bike', 21000, 25000, 3, 'reported', 'within', 24000, 'amount', 50, '2026-11-20T05:31:00.000Z', '2026-11-20T05:50:00.000Z', '2026-11-20T06:10:00.000Z', 'trip-fri', 'nha-minh-anh', 'Nhà', '2026-11-20T05:30:00.000Z'),
@@ -278,7 +278,7 @@ on conflict (id) do update set user_id = excluded.user_id, delta = excluded.delt
 
 -- notifications (5)
 insert into public.notifications (id, user_id, category, kind, icon, tone, logo, title, body, cta, link, created_at, read_at) values
-  ('nt-used', '00000000-0000-4000-8000-000000000001', 'trip', 'code_used', 'receipt', 'tint', 'be', 'Mã FREGO10 đã được dùng cho chuyến Be', 'Giá thật tiết kiệm được bao nhiêu? Báo giá để được cộng điểm.', 'Báo giá ›', '/bao-gia/trip-today', '2026-11-22T11:05:00.000Z', null),
+  ('nt-used', '00000000-0000-4000-8000-000000000001', 'trip', 'code_used', 'receipt', 'tint', 'be', 'Mã FREGO20 đã được dùng cho chuyến Be', 'Giá thật tiết kiệm được bao nhiêu? Báo giá để được cộng điểm.', 'Báo giá ›', '/bao-gia/trip-today', '2026-11-22T11:05:00.000Z', null),
   ('nt-gift', '00000000-0000-4000-8000-000000000001', 'voucher', 'gift', 'gift', 'deal', 'cafe', 'Cà phê Mây tặng bạn voucher −20.000đ', 'Dùng cho chuyến Grab ô tô đến khu Chợ Bến Thành, hạn 30/11.', 'Xem mã ›', '/voucher/uv-may7k2q', '2026-11-22T08:20:00.000Z', null),
   ('nt-card', '00000000-0000-4000-8000-000000000001', 'voucher', 'card_match', 'card2', 'deal', 'grab', 'Mã mới hợp thẻ VPBank của bạn', 'VPBTRANSPORT giảm 15.000đ cho chuyến GrabBike, GrabCar từ 50.000đ.', 'Chi tiết ›', '/ma/pc-vpb', '2026-11-22T02:12:00.000Z', null),
   ('nt-points', '00000000-0000-4000-8000-000000000001', 'trip', 'points', 'sparkplus', 'tint', 'frego', 'Bạn được cộng 50 điểm', 'Cảm ơn bạn đã báo giá chuyến Grab ô tô Nhà → Công ty. Bạn đang có 1.250 điểm.', 'Đổi voucher ›', '/diem-thuong', '2026-11-21T01:52:00.000Z', '2026-11-21T02:00:00.000Z'),
@@ -312,7 +312,7 @@ on conflict (id) do update set business_id = excluded.business_id, month = exclu
 -- support_tickets (6)
 insert into public.support_tickets (id, requester_name, requester_kind, topic, subject, status, due_at, created_at) values
   ('st-1', 'Gia Huy', 'user', 'points', 'Chưa được cộng điểm báo giá', 'open', null, '2026-11-22T01:30:00.000Z'),
-  ('st-1042', 'Minh Anh', 'user', 'code', 'Mã FREGO10 báo hết hạn khi nhập', 'open', null, '2026-11-22T10:35:00.000Z'),
+  ('st-1042', 'Minh Anh', 'user', 'code', 'Mã FREGO20 báo hết hạn khi nhập', 'open', null, '2026-11-22T10:35:00.000Z'),
   ('st-1041', 'Tiệm trà Sen', 'business', 'billing', 'Đã chuyển khoản nhưng ví chưa cộng', 'pending', null, '2026-11-22T09:45:00.000Z'),
   ('st-1040', 'Quốc Bảo', 'user', 'data_delete', 'Xin xóa dữ liệu tài khoản', 'pending', '2026-12-21T13:10:00.000Z', '2026-11-21T13:10:00.000Z'),
   ('st-1039', 'Phòng tập Nhịp', 'business', 'other', 'Hỏi lý do chiến dịch bị từ chối', 'done', null, '2026-11-21T08:20:00.000Z'),
@@ -492,32 +492,32 @@ insert into public.stats (id, scope, metric, period, key, value, sort) values
   ('platform|kpi|2026-10|price_reports', 'platform', 'kpi', '2026-10', 'price_reports', 3410, 4),
   ('platform|codes_used_by_source|2026-11|sponsor', 'platform', 'codes_used_by_source', '2026-11', 'sponsor', 4120, 0),
   ('platform|codes_used_by_source|2026-11|public', 'platform', 'codes_used_by_source', '2026-11', 'public', 2610, 1),
-  ('platform|codes_used_by_source|2026-11|frego', 'platform', 'codes_used_by_source', '2026-11', 'frego', 2484, 2),
+  ('platform|codes_used_by_source|2026-11|frego', 'platform', 'codes_used_by_source', '2026-11', 'frego', 395, 2),
   ('platform|codes_used_by_source|2026-10|sponsor', 'platform', 'codes_used_by_source', '2026-10', 'sponsor', 3030, 0),
   ('platform|codes_used_by_source|2026-10|public', 'platform', 'codes_used_by_source', '2026-10', 'public', 2690, 1),
-  ('platform|codes_used_by_source|2026-10|frego', 'platform', 'codes_used_by_source', '2026-10', 'frego', 2580, 2),
-  ('platform|codes_used_daily|2026-11|2026-11-01', 'platform', 'codes_used_daily', '2026-11', '2026-11-01', 523, 0),
-  ('platform|codes_used_daily|2026-11|2026-11-02', 'platform', 'codes_used_daily', '2026-11', '2026-11-02', 360, 1),
-  ('platform|codes_used_daily|2026-11|2026-11-03', 'platform', 'codes_used_daily', '2026-11', '2026-11-03', 391, 2),
-  ('platform|codes_used_daily|2026-11|2026-11-04', 'platform', 'codes_used_daily', '2026-11', '2026-11-04', 347, 3),
-  ('platform|codes_used_daily|2026-11|2026-11-05', 'platform', 'codes_used_daily', '2026-11', '2026-11-05', 350, 4),
-  ('platform|codes_used_daily|2026-11|2026-11-06', 'platform', 'codes_used_daily', '2026-11', '2026-11-06', 409, 5),
-  ('platform|codes_used_daily|2026-11|2026-11-07', 'platform', 'codes_used_daily', '2026-11', '2026-11-07', 493, 6),
-  ('platform|codes_used_daily|2026-11|2026-11-08', 'platform', 'codes_used_daily', '2026-11', '2026-11-08', 528, 7),
-  ('platform|codes_used_daily|2026-11|2026-11-09', 'platform', 'codes_used_daily', '2026-11', '2026-11-09', 415, 8),
-  ('platform|codes_used_daily|2026-11|2026-11-10', 'platform', 'codes_used_daily', '2026-11', '2026-11-10', 348, 9),
-  ('platform|codes_used_daily|2026-11|2026-11-11', 'platform', 'codes_used_daily', '2026-11', '2026-11-11', 405, 10),
-  ('platform|codes_used_daily|2026-11|2026-11-12', 'platform', 'codes_used_daily', '2026-11', '2026-11-12', 368, 11),
-  ('platform|codes_used_daily|2026-11|2026-11-13', 'platform', 'codes_used_daily', '2026-11', '2026-11-13', 345, 12),
-  ('platform|codes_used_daily|2026-11|2026-11-14', 'platform', 'codes_used_daily', '2026-11', '2026-11-14', 492, 13),
-  ('platform|codes_used_daily|2026-11|2026-11-15', 'platform', 'codes_used_daily', '2026-11', '2026-11-15', 537, 14),
-  ('platform|codes_used_daily|2026-11|2026-11-16', 'platform', 'codes_used_daily', '2026-11', '2026-11-16', 394, 15),
-  ('platform|codes_used_daily|2026-11|2026-11-17', 'platform', 'codes_used_daily', '2026-11', '2026-11-17', 349, 16),
-  ('platform|codes_used_daily|2026-11|2026-11-18', 'platform', 'codes_used_daily', '2026-11', '2026-11-18', 371, 17),
-  ('platform|codes_used_daily|2026-11|2026-11-19', 'platform', 'codes_used_daily', '2026-11', '2026-11-19', 352, 18),
-  ('platform|codes_used_daily|2026-11|2026-11-20', 'platform', 'codes_used_daily', '2026-11', '2026-11-20', 411, 19),
-  ('platform|codes_used_daily|2026-11|2026-11-21', 'platform', 'codes_used_daily', '2026-11', '2026-11-21', 536, 20),
-  ('platform|codes_used_daily|2026-11|2026-11-22', 'platform', 'codes_used_daily', '2026-11', '2026-11-22', 490, 21),
+  ('platform|codes_used_by_source|2026-10|frego', 'platform', 'codes_used_by_source', '2026-10', 'frego', 352, 2),
+  ('platform|codes_used_daily|2026-11|2026-11-01', 'platform', 'codes_used_daily', '2026-11', '2026-11-01', 404, 0),
+  ('platform|codes_used_daily|2026-11|2026-11-02', 'platform', 'codes_used_daily', '2026-11', '2026-11-02', 278, 1),
+  ('platform|codes_used_daily|2026-11|2026-11-03', 'platform', 'codes_used_daily', '2026-11', '2026-11-03', 302, 2),
+  ('platform|codes_used_daily|2026-11|2026-11-04', 'platform', 'codes_used_daily', '2026-11', '2026-11-04', 268, 3),
+  ('platform|codes_used_daily|2026-11|2026-11-05', 'platform', 'codes_used_daily', '2026-11', '2026-11-05', 271, 4),
+  ('platform|codes_used_daily|2026-11|2026-11-06', 'platform', 'codes_used_daily', '2026-11', '2026-11-06', 316, 5),
+  ('platform|codes_used_daily|2026-11|2026-11-07', 'platform', 'codes_used_daily', '2026-11', '2026-11-07', 381, 6),
+  ('platform|codes_used_daily|2026-11|2026-11-08', 'platform', 'codes_used_daily', '2026-11', '2026-11-08', 408, 7),
+  ('platform|codes_used_daily|2026-11|2026-11-09', 'platform', 'codes_used_daily', '2026-11', '2026-11-09', 321, 8),
+  ('platform|codes_used_daily|2026-11|2026-11-10', 'platform', 'codes_used_daily', '2026-11', '2026-11-10', 269, 9),
+  ('platform|codes_used_daily|2026-11|2026-11-11', 'platform', 'codes_used_daily', '2026-11', '2026-11-11', 313, 10),
+  ('platform|codes_used_daily|2026-11|2026-11-12', 'platform', 'codes_used_daily', '2026-11', '2026-11-12', 285, 11),
+  ('platform|codes_used_daily|2026-11|2026-11-13', 'platform', 'codes_used_daily', '2026-11', '2026-11-13', 267, 12),
+  ('platform|codes_used_daily|2026-11|2026-11-14', 'platform', 'codes_used_daily', '2026-11', '2026-11-14', 380, 13),
+  ('platform|codes_used_daily|2026-11|2026-11-15', 'platform', 'codes_used_daily', '2026-11', '2026-11-15', 417, 14),
+  ('platform|codes_used_daily|2026-11|2026-11-16', 'platform', 'codes_used_daily', '2026-11', '2026-11-16', 305, 15),
+  ('platform|codes_used_daily|2026-11|2026-11-17', 'platform', 'codes_used_daily', '2026-11', '2026-11-17', 270, 16),
+  ('platform|codes_used_daily|2026-11|2026-11-18', 'platform', 'codes_used_daily', '2026-11', '2026-11-18', 287, 17),
+  ('platform|codes_used_daily|2026-11|2026-11-19', 'platform', 'codes_used_daily', '2026-11', '2026-11-19', 272, 18),
+  ('platform|codes_used_daily|2026-11|2026-11-20', 'platform', 'codes_used_daily', '2026-11', '2026-11-20', 318, 19),
+  ('platform|codes_used_daily|2026-11|2026-11-21', 'platform', 'codes_used_daily', '2026-11', '2026-11-21', 414, 20),
+  ('platform|codes_used_daily|2026-11|2026-11-22', 'platform', 'codes_used_daily', '2026-11', '2026-11-22', 379, 21),
   ('platform|estimate_gap|2026-11|gsm|Quận 1', 'platform', 'estimate_gap', '2026-11', 'gsm|Quận 1', 14, 0),
   ('platform|estimate_gap|2026-11|gsm|Quận 3', 'platform', 'estimate_gap', '2026-11', 'gsm|Quận 3', 9, 1),
   ('platform|estimate_gap|2026-11|gsm|Quận 7', 'platform', 'estimate_gap', '2026-11', 'gsm|Quận 7', 6, 2),
@@ -566,11 +566,11 @@ insert into public.stats (id, scope, metric, period, key, value, sort) values
   ('platform|reward_redeemed|2026-11|rw-be', 'platform', 'reward_redeemed', '2026-11', 'rw-be', 220, 0),
   ('platform|reward_redeemed|2026-11|rw-gsm', 'platform', 'reward_redeemed', '2026-11', 'rw-gsm', 80, 1),
   ('platform|reward_redeemed|2026-11|rw-grab', 'platform', 'reward_redeemed', '2026-11', 'rw-grab', 64, 2),
-  ('platform|frego_code_used|2026-11|fc-frego10', 'platform', 'frego_code_used', '2026-11', 'fc-frego10', 2120, 0),
+  ('platform|frego_code_used|2026-11|fc-welcome', 'platform', 'frego_code_used', '2026-11', 'fc-welcome', 31, 0),
   ('platform|frego_code_used|2026-11|fc-r-be', 'platform', 'frego_code_used', '2026-11', 'fc-r-be', 220, 1),
   ('platform|frego_code_used|2026-11|fc-r-gsm', 'platform', 'frego_code_used', '2026-11', 'fc-r-gsm', 80, 2),
   ('platform|frego_code_used|2026-11|fc-r-grab', 'platform', 'frego_code_used', '2026-11', 'fc-r-grab', 64, 3),
-  ('platform|frego_code_budget|2026-11|total', 'platform', 'frego_code_budget', '2026-11', 'total', 40000000, 0),
+  ('platform|frego_code_budget|2026-11|total', 'platform', 'frego_code_budget', '2026-11', 'total', 10000000, 0),
   ('platform|notif_sent|2026-11|gift', 'platform', 'notif_sent', '2026-11', 'gift', 12960, 0),
   ('platform|notif_sent|2026-11|card', 'platform', 'notif_sent', '2026-11', 'card', 3420, 1),
   ('platform|notif_sent|2026-11|expire', 'platform', 'notif_sent', '2026-11', 'expire', 5870, 2),

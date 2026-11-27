@@ -62,7 +62,7 @@ const SECTIONS: LegalSection[] = [
           "Hết ngân sách thì quán ngừng tặng, mã đã có trong Ví vẫn dùng đến hết hạn.",
           "Mã công khai của hãng xe, ngân hàng, ví điện tử ghi rõ nguồn và lần kiểm tra gần nhất.",
           `Mã không dùng được thì bạn báo lỗi trong chi tiết mã. Mã bị từ ${brand.autoHideReportThreshold} người báo trong 24 giờ sẽ tự ẩn.`,
-          `Quà chào mừng: nhập điểm đến đầu tiên để nhận mã ${brand.welcomeCode} giảm ${formatVnd(brand.welcomeAmount)} cho chuyến ${serviceShortLabel("be", "bike")}.`,
+          `Quà chào mừng: nhập điểm đến đầu tiên để nhận mã ${brand.welcomeCode} giảm ${formatVnd(brand.welcomeAmount)} cho chuyến ${serviceShortLabel("be", "bike")}. Quà có ${brand.welcomeQuota} suất, hết suất thì dừng phát.`,
         ]}
       />
     ),

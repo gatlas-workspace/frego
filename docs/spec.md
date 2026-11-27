@@ -73,4 +73,4 @@ Cộng thêm: landing page cho người đặt xe (cùng màu, font, thành ph�
 
 ## Số liệu mẫu cần chốt
 
-Phí dịch vụ 3.000đ mỗi mã; quà chào mừng FREGO10; link App Store, Google Play, mã QR; màu, logo, tên các quán (đang là tạm).
+Đã chốt 27/11/2026: phí dịch vụ 3.000đ mỗi mã; quà chào mừng FREGO20 giảm 20.000đ chuyến Be xe máy, 50 suất. Còn cần chốt: link App Store, Google Play, mã QR; màu, logo, tên các quán (đang là tạm).

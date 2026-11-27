@@ -140,7 +140,7 @@ const kindRows: TableRow[] = [
     ],
   },
   [
-    { text: 'FREGO10', code: true },
+    { text: 'FREGO20', code: true },
     { text: 'Quốc Bảo', avatar: true },
     { text: '20/11/2026', muted: true },
     { text: '0đ', strong: true },
@@ -323,7 +323,7 @@ export default function ComponentGallery() {
             <Check tone="green" title="Địa chỉ quán khớp vị trí trên bản đồ" />
             <Check tone="amber" title="Ví chỉ đủ khoảng 65 mã" text="Chiến dịch tự dừng khi ví hết." />
             <Check tone="red" title="Ảnh có số điện thoại và mã QR" text="Nên từ chối và xin ảnh khác." />
-            <Check tone="blue" title="Bằng mức giảm của FREGO10" text="Gợi ý tăng lên 15.000đ." />
+            <Check tone="blue" title="Bằng mức giảm của FREGO20" text="Gợi ý tăng lên 15.000đ." />
           </div>
         </Block>
 

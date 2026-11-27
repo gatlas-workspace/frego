@@ -1,6 +1,7 @@
 import { initials as initialsOf, PROVIDERS, type CategoryKey, type ProviderId } from '@frego/core';
 import { cx } from './cx';
 import { WebIcon } from './WebIcon';
+import { PROVIDER_LOGO_SRC } from '@/components/app/ProviderLogo';
 
 /* Các ô biểu tượng nhỏ: logo Frego, logo quán theo ngành, logo hãng xe, ảnh đại diện chữ cái. Đều là trang trí (aria-hidden). */
 
@@ -82,6 +83,7 @@ export function ProviderMark({
   className?: string;
 }) {
   const box = cx('flex-none overflow-hidden shadow-[0_0_0_1px_rgba(15,15,15,0.08)]', providerRadius[size], className);
+  src ??= PROVIDER_LOGO_SRC[provider];
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element -- logo nhỏ, tĩnh
     return <img src={src} alt="" aria-hidden="true" width={size} height={size} className={cx(box, 'block object-cover')} />;

@@ -159,7 +159,7 @@ export interface ComparisonView {
   insight: string | null;
   /** "Đã gắn 3 voucher" */
   attachedTitle: string;
-  /** "FREGO10 · Cà phê Mây · Quán bún Ngõ Nhỏ" */
+  /** "FREGO20 · Cà phê Mây · Quán bún Ngõ Nhỏ" */
   attachedLine: string;
   /** "17:40 là giờ cao điểm, khoảng giá đã nới rộng. Giá cuối cùng do app hãng hiển thị." */
   peakNote: string | null;

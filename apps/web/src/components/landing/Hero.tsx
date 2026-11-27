@@ -16,7 +16,8 @@ import { Wrap } from "./ui";
 
 export const PROVIDER_NAMES = PROVIDER_ORDER.map((p) => PROVIDERS[p].name).join(", ");
 
-const BE_FINAL = formatVndRange(21000, 26000);
+// Ví dụ Landmark 81 → Chợ Bến Thành giờ cao điểm: Be xe máy 31.000–36.000đ trước mã chào mừng.
+const BE_FINAL = formatVndRange(31000 - brand.welcomeAmount, 36000 - brand.welcomeAmount);
 const GRAB_FINAL = formatVndRange(25000, 30000);
 
 /** Dữ liệu mẫu màn So giá trong điện thoại (heroRows của thiết kế). */

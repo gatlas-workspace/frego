@@ -65,7 +65,7 @@ begin
   -- Báo giá chuyến hôm nay: +10 một chạm, +50 nhập số tiền, không cộng lần hai.
   r := public.report_price('{"tripId":"trip-today","verdict":"within"}');
   assert (r->>'points_awarded')::int = 10, 'một chạm +10';
-  r := public.report_price('{"tripId":"trip-today","paidAmount":24000}');
+  r := public.report_price('{"tripId":"trip-today","paidAmount":15000}');
   assert (r->>'points_awarded')::int = 50 and (r->>'points')::int = 1310, 'nhập số tiền +50 → 1.310';
   r := public.report_price('{"tripId":"trip-today","verdict":"cheaper"}');
   assert (r->>'points_awarded')::int = 0, 'không cộng điểm hai lần';
@@ -100,7 +100,7 @@ begin
   assert (select count(*) from public.notifications where read_at is null) = 0, 'đã đọc hết';
 
   -- Quà chào mừng không phát lại.
-  assert public.ensure_welcome_voucher('{}') is null, 'FREGO10 không phát lần hai';
+  assert public.ensure_welcome_voucher('{}') is null, 'FREGO20 không phát lần hai';
 end $$;
 
 -- Không tự sửa điểm.
@@ -129,12 +129,28 @@ exception when insufficient_privilege then null;
 end $$;
 do $$ begin perform pg_temp.reset(); end $$;
 
+-- Quà chào mừng: còn suất thì phát, hết suất thì dừng.
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000002'); end $$;
+do $$
+declare r jsonb;
+begin
+  r := public.ensure_welcome_voucher('{}');
+  assert r->>'code' = 'FREGO20' and (r->>'amount')::int = 20000, 'Gia Huy nhận FREGO20 −20.000đ';
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+update public.frego_codes set issued_count = quota where kind = 'welcome';
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000004'); end $$;
+do $$ begin
+  assert public.ensure_welcome_voucher('{}') is null, 'hết 50 suất thì không phát';
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+
 -- Người dùng khác không thấy dữ liệu của Minh Anh.
 do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000002'); end $$;
 do $$ begin
   assert (select count(*) from public.trips) = (select gh_trips from expect), 'Gia Huy chỉ thấy chuyến của mình';
   assert (select count(*) from public.trips where user_id <> auth.uid()) = 0, 'Gia Huy không thấy chuyến của Minh Anh';
-  assert (select count(*) from public.user_vouchers) = (select gh_vouchers from expect), 'Gia Huy chỉ thấy ví của mình';
+  assert (select count(*) from public.user_vouchers) = (select gh_vouchers + 1 from expect), 'Gia Huy chỉ thấy ví của mình (thêm quà chào mừng)';
   assert (select count(*) from public.profiles) = 1, 'Gia Huy chỉ thấy hồ sơ của mình';
 end $$;
 do $$ begin perform pg_temp.reset(); end $$;

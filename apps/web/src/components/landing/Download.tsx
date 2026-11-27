@@ -20,7 +20,8 @@ export function Download() {
             </h2>
             <p className="m-0 max-w-[560px] text-lg leading-[1.6] text-app-on-primary-soft">
               Tải {brand.name}, nhập điểm đến đầu tiên và nhận ngay mã {brand.welcomeCode} giảm{" "}
-              {formatVnd(brand.welcomeAmount)} cho chuyến {serviceShortLabel("be", "bike")}.
+              {formatVnd(brand.welcomeAmount)} cho chuyến {serviceShortLabel("be", "bike")}, dành cho {brand.welcomeQuota} người
+              đầu tiên.
             </p>
             <div className="flex flex-wrap items-center gap-3.5 pt-1.5">
               <StoreButton platform="ios" variant="white" />

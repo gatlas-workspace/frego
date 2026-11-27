@@ -13,7 +13,7 @@ export type PriceRowData = {
   final?: string;
   /** Giá gốc (gạch ngang). */
   base?: string;
-  /** Dòng voucher đã gắn, VD "Đã gắn FREGO10, giảm 10.000đ". */
+  /** Dòng voucher đã gắn, VD "Đã gắn FREGO20, giảm 10.000đ". */
   voucherText?: string;
   /** Có bảng giá ở khu vực này không. */
   priced: boolean;

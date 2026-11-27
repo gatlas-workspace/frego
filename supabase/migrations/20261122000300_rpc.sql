@@ -301,7 +301,7 @@ begin
   return jsonb_build_object('count', n);
 end $$;
 
--- ───────────── ensure_welcome_voucher: quà chào mừng FREGO10 (một lần) ─────────────
+-- ───────────── ensure_welcome_voucher: quà chào mừng (một lần; giới hạn suất ở migration welcome_quota) ─────────────
 
 create or replace function public.ensure_welcome_voucher(args jsonb default '{}')
 returns jsonb language plpgsql security definer set search_path = public as $$

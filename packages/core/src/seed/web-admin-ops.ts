@@ -76,7 +76,7 @@ const staffProfiles: Profile[] = [
 
 const tickets: SupportTicket[] = (
   [
-  { id: 'st-1042', requesterName: 'Minh Anh', requesterKind: 'user', topic: 'code', subject: 'Mã FREGO10 báo hết hạn khi nhập', status: 'open', dueAt: null, createdAt: vn('2026-11-22 17:35') },
+  { id: 'st-1042', requesterName: 'Minh Anh', requesterKind: 'user', topic: 'code', subject: 'Mã FREGO20 báo hết hạn khi nhập', status: 'open', dueAt: null, createdAt: vn('2026-11-22 17:35') },
   { id: 'st-1041', requesterName: 'Tiệm trà Sen', requesterKind: 'business', topic: 'billing', subject: 'Đã chuyển khoản nhưng ví chưa cộng', status: 'pending', dueAt: null, createdAt: vn('2026-11-22 16:45') },
   // Yêu cầu xóa dữ liệu: phải xong trong 30 ngày.
   { id: 'st-1040', requesterName: 'Quốc Bảo', requesterKind: 'user', topic: 'data_delete', subject: 'Xin xóa dữ liệu tài khoản', status: 'pending', dueAt: vn('2026-12-21 20:10'), createdAt: vn('2026-11-21 20:10') },
@@ -120,7 +120,7 @@ export const adminOpsSeed: Partial<Seed> = {
 
   frego_codes: [
     // Mã nháp chưa phát cho ai (QT 8 · Mã Frego).
-    { id: 'fc-fregomoi', code: 'FREGOMOI', kind: 'promo', providerId: 'grab', vehicleClass: 'bike', amount: 15000, title: 'Chuyến đầu', validDays: 30, issuedCount: 0, usedCount: 0, active: false },
+    { id: 'fc-fregomoi', code: 'FREGOMOI', kind: 'promo', providerId: 'grab', vehicleClass: 'bike', amount: 15000, title: 'Chuyến đầu', validDays: 30, quota: null, issuedCount: 0, usedCount: 0, active: false },
   ],
 
   support_tickets: tickets,

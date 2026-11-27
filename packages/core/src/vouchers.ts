@@ -27,7 +27,7 @@ export interface CodeOffer {
   /** "uv:<id>" (mã trong ví), "cp:<campaignId>" (ưu đãi chiến dịch chưa nhận), "pc:<id>" (mã công khai) */
   refId: string;
   source: CodeSource;
-  /** Đã nằm trong ví người dùng (tặng riêng / FREGO10) */
+  /** Đã nằm trong ví người dùng (tặng riêng / FREGO20) */
   inWallet: boolean;
   /** Chiến dịch tài trợ (cả mã đã nhận trong ví lẫn ưu đãi chưa nhận) */
   campaignId: string | null;

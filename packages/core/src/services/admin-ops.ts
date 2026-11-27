@@ -929,6 +929,7 @@ export function createAdminOpsService(db: Db) {
         amount,
         title,
         validDays,
+        quota: null,
         issuedCount: 0,
         usedCount: 0,
         active: input.active,

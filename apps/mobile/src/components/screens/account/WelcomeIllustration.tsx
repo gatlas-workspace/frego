@@ -97,7 +97,8 @@ export function WelcomeIllustration() {
         {/* Không xuống dòng; được tràn vào phần đệm như thiết kế (nowrap). */}
         <View style={{ marginRight: -12 }}>
           <T weight={800} size={22} lineHeight={25} color={colors.white} numberOfLines={1}>
-            {formatVnd(21000)}
+            {/* Be xe máy 31.000đ (Landmark 81 → Chợ Bến Thành) sau mã chào mừng */}
+            {formatVnd(31000 - brand.welcomeAmount)}
           </T>
         </View>
         <T weight={600} size={12} lineHeight={16} color={colors.white}>

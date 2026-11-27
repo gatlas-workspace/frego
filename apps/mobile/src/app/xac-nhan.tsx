@@ -1,4 +1,4 @@
-// 0c · Nhập mã 6 số (XacNhan-v2) → lời chào mừng sau khi đăng nhập, kèm quà FREGO10 đã vào Ví voucher.
+// 0c · Nhập mã 6 số (XacNhan-v2) → lời chào mừng sau khi đăng nhập, kèm quà FREGO20 đã vào Ví voucher.
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';

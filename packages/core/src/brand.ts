@@ -26,8 +26,10 @@ export const brand = {
   /** Số mẫu cần chốt (ghi chú thiết kế): phí dịch vụ mỗi mã được dùng. */
   serviceFeePerCode: 3000,
   /** Quà chào mừng khi đăng nhập lần đầu. */
-  welcomeCode: 'FREGO10',
-  welcomeAmount: 10000,
+  welcomeCode: 'FREGO20',
+  welcomeAmount: 20000,
+  /** Số suất quà chào mừng (phát cho người đăng nhập đầu tiên, hết suất thì dừng). */
+  welcomeQuota: 50,
   /** Mỗi hãng dùng 1 mã mỗi chuyến. */
   maxCodesPerProviderPerTrip: 1,
   /** Ước tính chỉ bật khi đủ số báo giá mỗi khu vực. */

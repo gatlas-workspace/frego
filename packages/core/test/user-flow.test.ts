@@ -15,14 +15,14 @@ describe('định dạng', () => {
 });
 
 describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành', () => {
-  it('gắn voucher tự động: Cà phê Mây (Grab ô tô), FREGO10 (Be xe máy), Quán bún (Grab xe máy)', async () => {
+  it('gắn voucher tự động: Cà phê Mây (Grab ô tô), FREGO20 (Be xe máy), Quán bún (Grab xe máy)', async () => {
     const { svc } = setup();
     const plan = await svc.planTrip('ben-thanh');
     expect(plan.title).toBe('Landmark 81 → Chợ Bến Thành');
     expect(plan.subtitle).toBe('5,8 km · khoảng 20 phút');
     const items = svc.attachItems(plan, plan.selection);
     const attached = items.filter((i) => i.attached).map((i) => i.name).sort();
-    expect(attached).toEqual(['Cà phê Mây', 'FREGO10', 'Quán bún Ngõ Nhỏ']);
+    expect(attached).toEqual(['Cà phê Mây', 'FREGO20', 'Quán bún Ngõ Nhỏ']);
     const names = items.map((i) => i.name);
     expect(names).toContain('Tiệm trà Sen');
     expect(names).toContain('VPBTRANSPORT');
@@ -51,15 +51,15 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     const plan = await svc.planTrip('ben-thanh');
     const bike = await svc.compare(plan, plan.selection, 'bike');
     expect(bike.rows.map((r) => [r.name, r.finalText, r.baseText])).toEqual([
-      ['Be', '21.000–26.000đ', '31.000–36.000đ'],
+      ['Be', '11.000–16.000đ', '31.000–36.000đ'],
       ['Grab', '25.000–30.000đ', '35.000–40.000đ'],
       ['Green SM', '', ''],
     ]);
-    expect(bike.rows[0].voucherText).toBe('Đã gắn FREGO10, giảm 10.000đ');
+    expect(bike.rows[0].voucherText).toBe('Đã gắn FREGO20, giảm 20.000đ');
     expect(bike.rows[1].voucherText).toBe('Đã gắn mã Quán bún Ngõ Nhỏ, giảm 10.000đ');
     expect(bike.rows[2].autoNote).toBe('Green SM đang tự giảm 25%, không cần mã');
     expect(bike.insight).toBeNull();
-    expect(bike.attachedLine).toBe('FREGO10 · Cà phê Mây · Quán bún Ngõ Nhỏ');
+    expect(bike.attachedLine).toBe('FREGO20 · Cà phê Mây · Quán bún Ngõ Nhỏ');
     expect(bike.peakNote).toBe('17:45 là giờ cao điểm, khoảng giá đã nới rộng. Giá cuối cùng do app hãng hiển thị.');
 
     const car = await svc.compare(plan, plan.selection, 'car4');
@@ -80,17 +80,17 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     const cmp = await svc.compare(plan, plan.selection, 'bike');
     const open = await svc.openProvider(plan, plan.selection, cmp.rows[0]);
     expect(open.title).toBe('Mở app Be để đặt xe');
-    expect(open.code).toBe('FREGO10');
-    expect(open.estimateText).toBe('21.000–26.000đ');
+    expect(open.code).toBe('FREGO20');
+    expect(open.estimateText).toBe('11.000–16.000đ');
     expect(open.prefillsDestination).toBe(false);
     expect(open.step1).toEqual(['Be chưa tự điền điểm đến,', ' địa chỉ đã được chép sẵn để bạn dán.']);
     expect(open.destAddress).toBe('Chợ Bến Thành, Đường Lê Lợi, phường Bến Thành');
     const used = await svc.simulateCodeUsed(open.trip.id);
-    expect(used.notification?.title).toBe('Mã FREGO10 vừa được dùng cho chuyến Be');
+    expect(used.notification?.title).toBe('Mã FREGO20 vừa được dùng cho chuyến Be');
     const r1 = await svc.reportPrice(open.trip.id, { verdict: 'within' });
     expect(r1.pointsAwarded).toBe(10);
     expect(r1.points).toBe(1260);
-    const r2 = await svc.reportPrice(open.trip.id, { paidAmount: 24000 });
+    const r2 = await svc.reportPrice(open.trip.id, { paidAmount: 15000 });
     expect(r2.pointsAwarded).toBe(50);
     const again = await svc.reportPrice(open.trip.id, { verdict: 'cheaper' });
     expect(again.pointsAwarded).toBe(0);
@@ -127,11 +127,27 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
   });
 });
 
+describe('quà chào mừng FREGO20', () => {
+  it('20.000đ, phát tối đa 50 suất', async () => {
+    const { db } = setup();
+    const fc = (await db.get('frego_codes', 'fc-welcome'))!;
+    expect([fc.code, fc.amount, fc.quota]).toEqual(['FREGO20', 20000, 50]);
+    db.setUser('00000000-0000-4000-8000-000000000002');
+    const v = await db.rpc('ensure_welcome_voucher', {});
+    expect(v?.code).toBe('FREGO20');
+    expect(await db.rpc('ensure_welcome_voucher', {})).toBeNull();
+    await db.update('frego_codes', 'fc-welcome', { issuedCount: 50 });
+    db.setUser('00000000-0000-4000-8000-000000000004');
+    expect(await db.rpc('ensure_welcome_voucher', {})).toBeNull();
+  });
+});
+
 describe('màn khác', () => {
   it('trang chủ, ví, điểm, lịch sử, tài khoản', async () => {
     const { svc } = setup();
     const home = await svc.getHome();
-    expect(home.banner?.title).toBe('Giảm 10.000đ chuyến Be xe máy');
+    expect(home.banner?.title).toBe('Giảm 20.000đ chuyến Be xe máy');
+    expect(home.banner?.ticketAmount).toBe('−20K');
     expect(home.recent.map((r) => [r.name, r.voucherChip])).toEqual([
       ['Chợ Bến Thành', '3 voucher'],
       ['Sân bay Tân Sơn Nhất', ''],
@@ -162,7 +178,7 @@ describe('màn khác', () => {
     expect(home.unreadCount).toBe(3);
 
     const wallet = await svc.getWallet();
-    expect(wallet.gifts.map((g) => g.title)).toEqual(['Cà phê Mây', 'Mã FREGO10']);
+    expect(wallet.gifts.map((g) => g.title)).toEqual(['Cà phê Mây', 'Mã FREGO20']);
     expect(wallet.publicCodes.map((c) => c.code)).toEqual(['VPBTRANSPORT', 'CHUYENXACAR', 'SANBAY', 'KLBIKE']);
     expect(wallet.publicCodes[0].okText).toBe('Thẻ VPBank của bạn');
     expect(wallet.publicCodes[3].warnText).toBe('Cần thẻ KienLongBank');
@@ -176,7 +192,7 @@ describe('màn khác', () => {
 
     const trips = await svc.listTrips();
     expect(trips[0]).toMatchObject({ group: 'Hôm nay', time: '17:40', chip: 'Chưa báo giá', title: 'Landmark 81 → Chợ Bến Thành' });
-    expect(trips[0].line).toBe('Be xe máy · mã FREGO10 · ước tính sau mã 21.000–26.000đ');
+    expect(trips[0].line).toBe('Be xe máy · mã FREGO20 · ước tính sau mã 11.000–16.000đ');
     expect(trips[1]).toMatchObject({ group: 'Hôm qua', chip: 'Chỉ xem giá', line: 'Đã so 3 hãng, chưa mở app hãng nào.' });
     expect(trips[2].line).toBe('Grab ô tô 4 chỗ · ước tính 75.000–86.000đ');
     expect(trips[3]).toMatchObject({ group: 'Thứ Sáu, 20/11', line: 'Be xe máy · voucher Tiệm bánh Mộc −10.000đ', paidText: 'Bạn trả 24.000đ' });

@@ -262,7 +262,7 @@ export interface CampaignEvent {
 
 export type CodeSource = 'sponsor' | 'frego' | 'public';
 
-/** Mã riêng trong ví của người dùng: voucher nhãn hàng tặng riêng hoặc mã Frego (FREGO10, đổi điểm). */
+/** Mã riêng trong ví của người dùng: voucher nhãn hàng tặng riêng hoặc mã Frego (FREGO20, đổi điểm). */
 export interface UserVoucher {
   id: string;
   userId: string;
@@ -317,7 +317,7 @@ export interface PublicCode {
   createdAt: ISODate;
 }
 
-/** Mã do Frego tự tài trợ (FREGO10, quà đổi điểm). */
+/** Mã do Frego tự tài trợ (FREGO20, quà đổi điểm). */
 export interface FregoCode {
   id: string;
   code: string;
@@ -328,6 +328,8 @@ export interface FregoCode {
   title: string;
   /** Số ngày hiệu lực sau khi phát */
   validDays: number;
+  /** Số mã tối đa được phát (null = không giới hạn) */
+  quota: number | null;
   issuedCount: number;
   usedCount: number;
   active: boolean;
@@ -360,7 +362,7 @@ export interface AttachedCode {
   /** id của UserVoucher hoặc PublicCode */
   refId: string;
   code: string;
-  /** Tên hiện cho người dùng: "Cà phê Mây", "FREGO10" */
+  /** Tên hiện cho người dùng: "Cà phê Mây", "FREGO20" */
   label: string;
   amount: number;
 }

@@ -37,18 +37,18 @@ export const adminStats: StatRow[] = [
   ...series('platform', 'codes_used_by_source', NOV, [
     ['sponsor', 4120],
     ['public', 2610],
-    ['frego', 2484],
+    ['frego', 395],
   ]),
   ...series('platform', 'codes_used_by_source', OCT, [
     ['sponsor', 3030],
     ['public', 2690],
-    ['frego', 2580],
+    ['frego', 352],
   ]),
   ...series(
     'platform',
     'codes_used_daily',
     NOV,
-    novDays([523, 360, 391, 347, 350, 409, 493, 528, 415, 348, 405, 368, 345, 492, 537, 394, 349, 371, 352, 411, 536, 490]),
+    novDays([404, 278, 302, 268, 271, 316, 381, 408, 321, 269, 313, 285, 267, 380, 417, 305, 270, 287, 272, 318, 414, 379]),
   ),
   ...series('platform', 'estimate_gap', NOV, [
     ['gsm|Quận 1', 14],

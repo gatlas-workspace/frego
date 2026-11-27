@@ -3,7 +3,7 @@ import { Button, Chip, DashLine, T } from '@/components/ui';
 import { colors } from '@/theme/tokens';
 
 export interface CodeBoxProps {
-  /** Mã ngắn để tự nhập trong app hãng, VD "FREGO10". */
+  /** Mã ngắn để tự nhập trong app hãng, VD "FREGO20". */
   code: string;
   /** VD "Giảm 10.000đ cho chuyến xe máy". */
   codeLine: string | null;

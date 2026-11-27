@@ -93,7 +93,7 @@ const ROWS: PriceRow[] = [
     base: null,
     finalText: '21.000–26.000đ',
     baseText: '31.000–36.000đ',
-    voucherText: 'Đã gắn FREGO10, giảm 10.000đ',
+    voucherText: 'Đã gắn FREGO20, giảm 10.000đ',
     attached: null,
     autoNote: null,
   },
@@ -305,7 +305,7 @@ export default function ThanhPhan() {
       <Section title="Ghi chú · UiInfoNote">
         <InfoNote icon="pinok" title="Điểm đến vẫn là Chợ Bến Thành" text="Voucher chỉ giảm giá, không đổi địa chỉ đến." />
         <InfoNote tone="neutral" icon="clock" text="Hạn dùng: chưa rõ ngày kết thúc. Frego kiểm tra lại mỗi ngày và tự ẩn khi mã hết." />
-        <InfoNote tone="deal" icon="ticket" title="Đã gắn 3 voucher" text="FREGO10 · Cà phê Mây · Quán bún Ngõ Nhỏ" />
+        <InfoNote tone="deal" icon="ticket" title="Đã gắn 3 voucher" text="FREGO20 · Cà phê Mây · Quán bún Ngõ Nhỏ" />
         <InfoNote tone="white" icon="spark" text="Be rẻ nhất cho chuyến này sau khi trừ voucher." />
         <InfoNote icon="check" text="Đã thêm. Frego kiểm tra điều kiện của mã rồi mới tính vào giá." live />
       </Section>
@@ -551,7 +551,7 @@ export default function ThanhPhan() {
           amountText="−10.000đ"
           serviceText="Be xe máy"
           tag="frego"
-          title="Mã FREGO10"
+          title="Mã FREGO20"
           line="Quà chào mừng khi bạn tham gia Frego"
           lineIcon="spark"
           metaText="HSD 30/11/2026"
@@ -589,7 +589,7 @@ export default function ThanhPhan() {
             amountText="−10.000đ"
             tag="frego"
             tagText="Quà chào mừng"
-            title="Mã FREGO10 cho chuyến Be xe máy"
+            title="Mã FREGO20 cho chuyến Be xe máy"
             line="Đã có trong Ví voucher, Frego tự gắn khi bạn đặt xe."
             notchColor={colors.surface}
           />
@@ -652,7 +652,7 @@ export default function ThanhPhan() {
         <NotifItem
           icon="receipt"
           logo="be"
-          title="Mã FREGO10 đã được dùng cho chuyến Be"
+          title="Mã FREGO20 đã được dùng cho chuyến Be"
           body="Giá thật tiết kiệm được bao nhiêu? Báo giá để được cộng điểm."
           metaText="18:05 · Chuyến đi"
           cta="Báo giá ›"
@@ -703,7 +703,7 @@ export default function ThanhPhan() {
       <Section title="Thông báo đẩy · UiPushNotif" bare>
         <View style={{ backgroundColor: colors.pushBg, borderRadius: 24, padding: 16 }}>
           <PushNotif
-            title="Mã FREGO10 vừa được dùng cho chuyến Be"
+            title="Mã FREGO20 vừa được dùng cho chuyến Be"
             body="Giá thật tiết kiệm được bao nhiêu? Bấm đánh giá để được cộng điểm."
           />
         </View>
@@ -771,7 +771,7 @@ export default function ThanhPhan() {
             Landmark 81 → Chợ Bến Thành
           </T>
           <T size={13} lineHeight={20} color={colors.ink2}>
-            Be xe máy · mã FREGO10 · ước tính sau mã 21.000–26.000đ
+            Be xe máy · mã FREGO20 · ước tính sau mã 21.000–26.000đ
           </T>
           <View style={{ paddingTop: 4 }}>
             <Button label="Báo giá thật" badge="+10 điểm" size="md" />

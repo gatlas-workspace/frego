@@ -538,10 +538,10 @@ export const campaignEvents: CampaignEvent[] = [
 /* ───────────── Mã Frego, quà đổi điểm ───────────── */
 
 export const fregoCodes: FregoCode[] = [
-  { id: 'fc-frego10', code: 'FREGO10', kind: 'welcome', providerId: 'be', vehicleClass: 'bike', amount: 10000, title: 'Quà chào mừng', validDays: 30, issuedCount: 2120, usedCount: 1640, active: true },
-  { id: 'fc-r-be', code: 'FRBE10', kind: 'reward', providerId: 'be', vehicleClass: 'bike', amount: 10000, title: 'Đổi 500 điểm', validDays: 30, issuedCount: 240, usedCount: 190, active: true },
-  { id: 'fc-r-gsm', code: 'FRGS15', kind: 'reward', providerId: 'gsm', vehicleClass: 'bike', amount: 15000, title: 'Đổi 1.000 điểm', validDays: 30, issuedCount: 82, usedCount: 51, active: true },
-  { id: 'fc-r-grab', code: 'FRGR20', kind: 'reward', providerId: 'grab', vehicleClass: 'car4', amount: 20000, title: 'Đổi 1.500 điểm', validDays: 30, issuedCount: 42, usedCount: 33, active: true },
+  { id: 'fc-welcome', code: 'FREGO20', kind: 'welcome', providerId: 'be', vehicleClass: 'bike', amount: 20000, title: 'Quà chào mừng', validDays: 30, quota: 50, issuedCount: 46, usedCount: 31, active: true },
+  { id: 'fc-r-be', code: 'FRBE10', kind: 'reward', providerId: 'be', vehicleClass: 'bike', amount: 10000, title: 'Đổi 500 điểm', validDays: 30, quota: null, issuedCount: 240, usedCount: 190, active: true },
+  { id: 'fc-r-gsm', code: 'FRGS15', kind: 'reward', providerId: 'gsm', vehicleClass: 'bike', amount: 15000, title: 'Đổi 1.000 điểm', validDays: 30, quota: null, issuedCount: 82, usedCount: 51, active: true },
+  { id: 'fc-r-grab', code: 'FRGR20', kind: 'reward', providerId: 'grab', vehicleClass: 'car4', amount: 20000, title: 'Đổi 1.500 điểm', validDays: 30, quota: null, issuedCount: 42, usedCount: 33, active: true },
 ];
 
 export const rewards: Reward[] = [
@@ -575,15 +575,15 @@ export const userVouchers: UserVoucher[] = [
     tripId: null,
   },
   {
-    id: 'uv-frego10',
+    id: 'uv-welcome',
     userId: DEMO_USER_ID,
     source: 'frego',
     campaignId: null,
-    fregoCodeId: 'fc-frego10',
-    code: 'FREGO10',
+    fregoCodeId: 'fc-welcome',
+    code: 'FREGO20',
     providerId: 'be',
     vehicleClass: 'bike',
-    amount: 10000,
+    amount: 20000,
     note: 'Quà chào mừng khi bạn tham gia Frego',
     reasons: [],
     status: 'active',
@@ -743,11 +743,11 @@ export const trips: Trip[] = [
     destPlaceId: 'ben-thanh',
     destLabel: 'Chợ Bến Thành',
     attached: [
-      { service: 'be-bike', source: 'frego', refId: 'uv:uv-frego10', code: 'FREGO10', label: 'FREGO10', amount: 10000 },
+      { service: 'be-bike', source: 'frego', refId: 'uv:uv-welcome', code: 'FREGO20', label: 'FREGO20', amount: 20000 },
     ],
     chosenService: 'be-bike',
-    estimateLow: 21000,
-    estimateHigh: 26000,
+    estimateLow: 11000,
+    estimateHigh: 16000,
     status: 'code_used',
     createdAt: vn('2026-11-22 17:40'),
     openedAt: vn('2026-11-22 17:41'),
@@ -829,7 +829,7 @@ export const notifications: AppNotification[] = [
     icon: 'receipt',
     tone: 'tint',
     logo: 'be',
-    title: 'Mã FREGO10 đã được dùng cho chuyến Be',
+    title: 'Mã FREGO20 đã được dùng cho chuyến Be',
     body: 'Giá thật tiết kiệm được bao nhiêu? Báo giá để được cộng điểm.',
     cta: 'Báo giá ›',
     link: '/bao-gia/trip-today',

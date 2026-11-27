@@ -498,6 +498,8 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       const fc = data.frego_codes.find((c) => c.kind === 'welcome' && c.active);
       if (!fc) return null;
       if (data.user_vouchers.some((v) => v.userId === u && v.fregoCodeId === fc.id)) return null;
+      // Hết suất quà chào mừng thì không phát nữa.
+      if (fc.quota !== null && fc.issuedCount >= fc.quota) return null;
       const issued = now();
       const v: UserVoucher = {
         id: uid(),

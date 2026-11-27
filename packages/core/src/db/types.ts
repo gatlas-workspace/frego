@@ -54,7 +54,7 @@ export interface Rpcs {
   redeem_reward: { args: { rewardId: string }; result: { voucher: UserVoucher; points: number } };
   vote_public_code: { args: { publicCodeId: string; works: boolean }; result: { ok: number; bad: number } };
   mark_all_notifications_read: { args: Record<string, never>; result: { count: number } };
-  /** Phát quà chào mừng FREGO10 khi đăng nhập lần đầu (không phát lại). */
+  /** Phát quà chào mừng FREGO20 khi đăng nhập lần đầu (không phát lại, tối đa brand.welcomeQuota suất). */
   ensure_welcome_voucher: { args: Record<string, never>; result: UserVoucher | null };
   /** Quản trị: khớp tiền nạp vào ví doanh nghiệp. */
   confirm_topup: { args: { transactionId: string }; result: { balance: number } };

@@ -31,8 +31,8 @@ export const adminOpsStats: StatRow[] = [
   // Lượt đổi quà trong tháng, theo id quà.
   ...series(P, 'reward_redeemed', NOV, [['rw-be', 220], ['rw-gsm', 80], ['rw-grab', 64]]),
   // Lượt dùng mã Frego trong tháng, theo id mã (cộng lại = codes_used_by_source.frego ở seed/stats-admin.ts).
-  ...series(P, 'frego_code_used', NOV, [['fc-frego10', 2120], ['fc-r-be', 220], ['fc-r-gsm', 80], ['fc-r-grab', 64]]),
-  ...series(P, 'frego_code_budget', NOV, [['total', 40000000]]),
+  ...series(P, 'frego_code_used', NOV, [['fc-welcome', 31], ['fc-r-be', 220], ['fc-r-gsm', 80], ['fc-r-grab', 64]]),
+  ...series(P, 'frego_code_budget', NOV, [['total', 10000000]]),
 
   /* QT 9 · Thông báo (tin ưu đãi chung tính từ bảng broadcasts) */
   ...series(P, 'notif_sent', NOV, [['gift', 12960], ['card', 3420], ['expire', 5870], ['report', 4120], ['points', 3996]]),
