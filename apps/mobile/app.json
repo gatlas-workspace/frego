@@ -12,7 +12,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "vn.frego.app",
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["grab", "be", "xanhsm"],
+        "LSApplicationQueriesSchemes": [
+          "grab",
+          "be",
+          "xanhsm"
+        ],
         "NSLocationWhenInUseUsageDescription": "Frego dùng vị trí khi đang mở app để điền điểm đón và tính quãng đường.",
         "NSPhotoLibraryUsageDescription": "Chọn ảnh đại diện cho tài khoản Frego.",
         "NSCameraUsageDescription": "Chụp ảnh đại diện cho tài khoản Frego."
@@ -26,7 +30,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -37,10 +44,36 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      ["expo-splash-screen", { "backgroundColor": "#F4F5FA", "image": "./assets/splash-icon.png", "imageWidth": 120 }],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4F5FA",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120
+        }
+      ],
       "expo-web-browser",
-      ["expo-image-picker", { "photosPermission": "Chọn ảnh đại diện cho tài khoản Frego.", "cameraPermission": "Chụp ảnh đại diện cho tài khoản Frego." }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Chọn ảnh đại diện cho tài khoản Frego.",
+          "cameraPermission": "Chụp ảnh đại diện cho tài khoản Frego."
+        }
+      ]
     ],
-    "experiments": { "typedRoutes": false }
+    "experiments": {
+      "typedRoutes": false
+    },
+    "owner": "gatlas.workspace",
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "6fc10379-54e7-47b4-a681-27e55ebacfac"
+      }
+    }
   }
 }
