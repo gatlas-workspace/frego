@@ -90,6 +90,7 @@ Cập nhật: 27/11/2026
 - Thêm vài thao tác thiết kế chưa vẽ nhưng cần để dùng thật: tên chiến dịch, lưu nháp, gỡ liên kết, chi tiết chiến dịch ở quản trị, chạy/tạm dừng mã Frego.
 
 ## Đang dở / để sau
+- Kết quả chạy thử toàn bộ (27/11/2026, bản 3.0.5) — còn để ngỏ: thông báo "Mã … đã được dùng" vẫn ngụ ý Frego biết mã đã dùng (thực tế chỉ biết qua biên nhận/người dùng báo); ở DEMO mọi số điện thoại đều vào tài khoản Minh Anh nên không thử được nhập mã giới thiệu của tài khoản mới; DEMO của app và web quản trị là hai kho dữ liệu riêng (duyệt ảnh ở web không thấy trong app); web Next (landing, cổng DN, quản trị, /moi) chưa có chỗ host nên link chia sẻ frego.vn/moi/<mã> chưa mở được; Ví mở sẵn tab "Công khai" thay vì "Tặng bạn"; vé ở Ví/Điểm thưởng/Chi tiết voucher, Lịch sử, Liên kết, Cài đặt thông báo vẫn kiểu v2; nhập đủ 6 số OTP chưa tự xác nhận; màn Báo giá chuyến cũ vẫn ghi "vừa được dùng".
 - Bản 3.0: chưa chạy `db:test` cho migration 20261127001200 (máy chưa có Postgres 16); link tải app trên trang `/moi/[ma]` đang trỏ về `/#tai-app` vì `brand.web` chưa có link cửa hàng thật; số lượt check-in có ảnh chưa đưa lên báo cáo doanh nghiệp (RPC `business_checkin_count` đã có); chưa thử trên máy thật phần máy ảnh + vị trí của ảnh tại quán (mới thử bản web).
 
 - Chưa chạy trên dự án Supabase thật (chưa có project, nhà cung cấp SMS); adapter Supabase mới kiểm tra qua seed + test SQL, chưa qua PostgREST thật.
