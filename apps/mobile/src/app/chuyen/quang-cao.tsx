@@ -31,7 +31,7 @@ export default function SponsorAdScreen() {
   const next = () => router.replace('/chuyen/mo-app');
 
   return (
-    <ModalSheet backdrop={<TripMapBackdrop vehicleClass={openView.vehicleClass} />} onDismiss={next} dismissLabel={ad.ctaLabel} gap={16} scroll>
+    <ModalSheet backdrop={<TripMapBackdrop vehicleClass={openView.vehicleClass} sponsorId={ad.businessId} />} onDismiss={next} dismissLabel={ad.ctaLabel} gap={16} scroll>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View style={{ borderWidth: 1, borderColor: colors.dash, borderRadius: 8, paddingVertical: 2, paddingHorizontal: 8 }}>
           <T weight={700} size={12} lineHeight={16} color={colors.ink2}>

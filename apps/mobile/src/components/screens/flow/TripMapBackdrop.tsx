@@ -13,8 +13,10 @@ const SHEET_SHARE = 0.62;
  * Nền bản đồ thật phía sau tấm trượt (màn 2c Quảng cáo, 3 Mở app): cùng bản đồ như Gắn voucher / So giá — đường đi theo
  * loại xe đã chọn, vòng 1 km, ghim quán có voucher dùng được — nhưng chỉ để xem (không kéo, không chạm).
  * Dùng lại cache truy vấn của MapHeader nên không hỏi máy chủ tìm đường thêm lần nào.
+ * Từ bước Quảng cáo trở đi chỉ còn ghim (logo) của quán đã tặng mã cho chuyến này (`sponsorId`); chuyến không dùng mã
+ * của quán thì không hiện ghim quán nào.
  */
-export function TripMapBackdrop({ vehicleClass }: { vehicleClass: VehicleClass }) {
+export function TripMapBackdrop({ vehicleClass, sponsorId }: { vehicleClass: VehicleClass; sponsorId: string | null }) {
   const { svc } = useApi();
   const { plan } = useTripFlow();
   const { height } = useWindowDimensions();
@@ -32,6 +34,7 @@ export function TripMapBackdrop({ vehicleClass }: { vehicleClass: VehicleClass }
   });
 
   if (!plan) return <MapRoute height="100%" labels={false} />;
+  const pins = sponsorId ? (sponsors.data ?? []).filter((p) => p.businessId === sponsorId) : [];
   const originName = plan.title.split(' → ')[0] ?? plan.origin.label;
   return (
     <MapSurface
@@ -42,7 +45,7 @@ export function TripMapBackdrop({ vehicleClass }: { vehicleClass: VehicleClass }
       }}
       dest={{ lat: plan.dest.lat, lng: plan.dest.lng, label: plan.dest.name }}
       route={routeLine.data ?? plan.route}
-      sponsors={sponsors.data ?? []}
+      sponsors={pins}
       nearbyRadiusM={DEST_RING_M}
       selectedId={null}
       onSelect={() => {}}

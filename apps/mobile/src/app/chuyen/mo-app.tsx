@@ -48,7 +48,7 @@ export default function OpenAppScreen() {
 
   return (
     <ModalSheet
-      backdrop={<TripMapBackdrop vehicleClass={view.vehicleClass} />}
+      backdrop={<TripMapBackdrop vehicleClass={view.vehicleClass} sponsorId={sponsorAd?.businessId ?? null} />}
       onDismiss={close}
       dismissLabel="Đóng, quay lại chọn hãng xe"
       gap={18}
