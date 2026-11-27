@@ -12,7 +12,7 @@
     "./seed": "./src/seed/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json",
     "test": "vitest run",
     "seed:sql": "tsx scripts/gen-seed-sql.ts"
   },
@@ -20,6 +20,7 @@
     "@supabase/supabase-js": "^2.50.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.7",
     "tsx": "^4.20.0",
     "typescript": "~5.9.3",
     "vitest": "^3.2.0"

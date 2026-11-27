@@ -2,9 +2,11 @@ import type { BaseTableName, Seed } from '../db/schema';
 import * as base from './base';
 import { businessSeed } from './web-business';
 import { adminSeed } from './web-admin';
+import { adminOpsSeed } from './web-admin-ops';
 import { baseStats } from './stats';
 import { businessStats } from './stats-business';
 import { adminStats } from './stats-admin';
+import { adminOpsStats } from './stats-admin-ops';
 
 export * from './base';
 export { series, novDays } from './stats';
@@ -72,6 +74,7 @@ export function createSeed(): Seed {
   });
   add(businessSeed);
   add(adminSeed);
-  add({ stats: [...baseStats, ...businessStats, ...adminStats] });
+  add(adminOpsSeed);
+  add({ stats: [...baseStats, ...businessStats, ...adminStats, ...adminOpsStats] });
   return JSON.parse(JSON.stringify(s));
 }
