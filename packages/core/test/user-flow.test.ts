@@ -82,6 +82,8 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     expect(open.code).toBe('FREGO10');
     expect(open.estimateText).toBe('21.000–26.000đ');
     expect(open.prefillsDestination).toBe(false);
+    expect(open.step1).toEqual(['Be chưa tự điền điểm đến,', ' địa chỉ đã được chép sẵn để bạn dán.']);
+    expect(open.destAddress).toBe('Chợ Bến Thành, Đường Lê Lợi, phường Bến Thành');
     const used = await svc.simulateCodeUsed(open.trip.id);
     expect(used.notification?.title).toBe('Mã FREGO10 vừa được dùng cho chuyến Be');
     const r1 = await svc.reportPrice(open.trip.id, { verdict: 'within' });
@@ -100,6 +102,7 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     const grab = cmp.rows.find((r) => r.providerId === 'grab')!;
     const open = await svc.openProvider(plan, plan.selection, grab);
     expect(open.code).toMatch(/^NHO[A-Z0-9]{4}$/);
+    expect(open.deepLink).toContain('grab://open?screenType=BOOKING&dropOffLatitude=10.7725');
     const mine = await db.list('user_vouchers', { where: { userId: DEMO_USER_ID, campaignId: 'cp-bun-trua' } });
     expect(mine).toHaveLength(1);
   });

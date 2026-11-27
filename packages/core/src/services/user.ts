@@ -175,9 +175,13 @@ export interface OpenAppView {
   code: string | null;
   codeLine: string | null;
   prefillsDestination: boolean;
+  /** Địa chỉ để chép/dán khi app hãng không nhận điểm đến qua link */
   destAddress: string;
-  appUrl: string;
+  /** Link mở app hãng (Grab: mở sẵn điểm đến) */
+  deepLink: string;
   storeUrl: string;
+  /** Bước 1 trên màn Mở app: [phần đậm, phần thường] */
+  step1: [string, string];
 }
 
 export interface WalletGiftView {
@@ -815,10 +819,10 @@ export function createUserService(db: Db) {
         estimateHigh: row.final?.high ?? null,
         comparedCount: 3,
       });
-      return service.openAppView(trip, plan.dest.address);
+      return service.openAppView(trip, plan.dest);
     },
 
-    openAppView(trip: Trip, destAddress: string): OpenAppView {
+    openAppView(trip: Trip, dest: Pick<Place, 'name' | 'address' | 'lat' | 'lng'>): OpenAppView {
       const { providerId, vehicleClass } = parseServiceKey(trip.chosenService!);
       const provider = PROVIDERS[providerId];
       const code = trip.attached.find((c) => c.service === trip.chosenService) ?? null;
@@ -833,9 +837,12 @@ export function createUserService(db: Db) {
         code: code?.code ?? null,
         codeLine: code ? `Giảm ${formatVnd(code.amount)} cho chuyến ${SERVICES[code.service].name.toLowerCase()}` : null,
         prefillsDestination: provider.prefillsDestination,
-        destAddress,
-        appUrl: provider.appUrl,
+        destAddress: `${dest.name}, ${dest.address}`,
+        deepLink: providerDeepLink(providerId, dest),
         storeUrl: provider.storeUrl,
+        step1: provider.prefillsDestination
+          ? [`${provider.name} mở sẵn điểm đến`, ', bạn chỉ cần nhập mã.']
+          : [`${provider.name} chưa tự điền điểm đến,`, ' địa chỉ đã được chép sẵn để bạn dán.'],
       };
     },
 
@@ -1198,6 +1205,16 @@ export function createUserService(db: Db) {
 }
 
 export type UserService = ReturnType<typeof createUserService>;
+
+/** Link mở app hãng. Grab nhận điểm đến qua tham số; Be, Green SM chỉ mở app. */
+export function providerDeepLink(providerId: ProviderId, dest: Pick<Place, 'name' | 'lat' | 'lng'>): string {
+  const p = PROVIDERS[providerId];
+  if (providerId === 'grab') {
+    const q = `screenType=BOOKING&dropOffLatitude=${dest.lat}&dropOffLongitude=${dest.lng}&dropOffAddress=${encodeURIComponent(dest.name)}`;
+    return `${p.appUrl}?${q}`;
+  }
+  return p.appUrl;
+}
 
 function normalize(s: string) {
   return s
