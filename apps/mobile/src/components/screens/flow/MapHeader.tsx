@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,11 @@ export interface MapHeaderProps {
   onTripChanged?: () => void;
   /** Loại xe để vẽ đường (So giá: theo tab). Mặc định xe máy. */
   vehicleClass?: VehicleClass;
+  /**
+   * Mã người dùng đang chọn (refId): bản đồ chỉ hiện quán có mã nằm trong danh sách này.
+   * Gắn voucher: các mã đã gắn; So giá: mã của hãng đang chọn. Bỏ trống (undefined) = hiện mọi quán dùng được.
+   */
+  focusRefIds?: readonly string[];
 }
 
 /** Bản đồ thật của chuyến + ghim quán tài trợ quanh điểm đến + nút quay lại trắng nổi ở góc trên trái. */
@@ -49,6 +54,7 @@ export function MapHeader({
   onExpandedChange,
   onTripChanged,
   vehicleClass = 'bike',
+  focusRefIds,
 }: MapHeaderProps) {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
@@ -94,7 +100,14 @@ export function MapHeader({
       });
   }, [pickup, plan, start]);
 
-  const pins = sponsors.data ?? [];
+  const allPins = sponsors.data ?? [];
+  const focusKey = focusRefIds ? focusRefIds.join('|') : null;
+  const pins = useMemo(
+    () => (focusRefIds ? allPins.filter((p) => p.refIds.some((r) => focusRefIds.includes(r))) : allPins),
+    // focusKey thay cho mảng (mảng mới mỗi lần vẽ).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allPins, focusKey],
+  );
   const selected = pins.find((p) => p.businessId === selectedId) ?? null;
   const showCard = expanded && !!selected;
 

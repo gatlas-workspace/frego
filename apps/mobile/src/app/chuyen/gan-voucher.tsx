@@ -24,6 +24,8 @@ export default function AttachScreen() {
   const [mapOpen, setMapOpen] = useState(false);
 
   const items = useMemo(() => (plan ? svc.attachItems(plan, selection, priority) : []), [svc, plan, selection, priority]);
+  // Bản đồ chỉ hiện quán có mã đang gắn (bấm Gắn/Bỏ gắn là ghim đổi theo).
+  const focusRefIds = useMemo(() => Object.values(selection).filter((r): r is string => !!r), [selection]);
   // Gom theo hãng + loại xe, giữ thứ tự ưu tiên của mục đầu mỗi nhóm.
   const groups = useMemo(() => {
     const m = new Map<ServiceKey, AttachItemView[]>();
@@ -69,6 +71,7 @@ export default function AttachScreen() {
         onBack={() => router.dismissTo('/tim-kiem')}
         expanded={mapOpen}
         onExpandedChange={setMapOpen}
+        focusRefIds={focusRefIds}
       />
       <Sheet
         title={plan.title}

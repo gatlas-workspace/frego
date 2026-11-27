@@ -186,6 +186,8 @@ export interface SponsorPinView {
   statusText: string;
   /** Nhãn đọc màn hình cho ghim */
   a11yLabel: string;
+  /** Mã (refId) của quán dùng được cho chuyến này — để bản đồ chỉ hiện quán có mã người dùng đang chọn */
+  refIds: string[];
 }
 
 export interface BannerView {
@@ -1214,6 +1216,7 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
               hoursText: `Tặng mã ${best.hoursFrom}–${best.hoursTo}`,
               statusText,
               a11yLabel: `${b.name}, voucher ${e.amountText} ${serviceText} dùng được cho chuyến này, ${distanceText.toLowerCase()}`,
+              refIds: [...new Set(list.map((x) => x.e.offer.refId))],
             } satisfies SponsorPinView,
           };
         })

@@ -94,6 +94,7 @@ export default function CompareScreen() {
         onExpandedChange={setMapOpen}
         onTripChanged={toAttach}
         vehicleClass={vehicleClass}
+        focusRefIds={sel?.attached ? [sel.attached.offer.refId] : []}
       />
       <Sheet
         title="Giá đã trừ voucher"
