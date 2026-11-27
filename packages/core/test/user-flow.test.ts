@@ -133,6 +133,13 @@ describe('màn khác', () => {
     ]);
     const deal = await svc.planTrip(home.deals[0].destPlaceId, { preferredCampaignId: home.deals[0].campaignId });
     expect(deal.selection['grab-car4']).toBe('uv:uv-may7k2q');
+    expect(home.deals.map((d) => [d.brand, d.destPlaceId])).toEqual([
+      ['Cà phê Mây', 'ben-thanh'],
+      ['Nhà sách Gió', 'ho-con-rua'],
+      ['Phòng tập Nhịp', 'landmark81'],
+      ['Tiệm bánh Mộc', 'cho-tan-dinh'],
+      ['Quán bún Ngõ Nhỏ', 'nguyen-hue'],
+    ]);
     expect(home.deals[0]).toMatchObject({ brand: 'Cà phê Mây', serviceText: 'Mã Grab ô tô', amountText: '−20.000đ', area: 'Gần Chợ Bến Thành' });
     expect(home.unreadCount).toBe(3);
 

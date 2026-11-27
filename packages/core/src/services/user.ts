@@ -643,14 +643,26 @@ export function createUserService(db: Db) {
           }
         : null;
       const places = [...byId.values()];
-      const deals: DealView[] = camps
-        .sort((a, b) => b.amount - a.amount)
+      // Mỗi khu một thẻ (mức giảm cao nhất), giảm nhiều trước, cùng mức thì sắp hết hạn trước.
+      const seenArea = new Set<string>();
+      const deals: DealView[] = [...camps]
+        .sort((a, b) => b.amount - a.amount || new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime())
+        .filter((c) => {
+          const area = normalize(c.business.landmark);
+          if (seenArea.has(area)) return false;
+          seenArea.add(area);
+          return true;
+        })
         .slice(0, 5)
         .map((c) => {
-          const nearest = places
+          const candidates = places
             .filter((p) => !['nha-minh-anh', 'cty-minh-anh'].includes(p.id))
             .map((p) => ({ p, d: distanceM(p, c.business) }))
-            .sort((a, b) => a.d - b.d)[0];
+            .filter((x) => x.d <= c.radiusM);
+          // Ưu tiên địa danh của quán ("Gần Chợ Bến Thành" → Chợ Bến Thành), rồi tới nơi gần quán nhất.
+          const nearest =
+            candidates.find((x) => normalize(x.p.name) === normalize(c.business.landmark)) ??
+            candidates.sort((a, b) => a.d - b.d)[0];
           return {
             campaignId: c.id,
             businessId: c.businessId,
@@ -660,7 +672,7 @@ export function createUserService(db: Db) {
             serviceText: `Mã ${serviceShortLabel(c.providerId, c.vehicleClass)}`,
             amountText: formatDiscount(c.amount),
             cta: 'Đặt xe ›',
-            destPlaceId: nearest && nearest.d <= c.radiusM ? nearest.p.id : `biz:${c.businessId}`,
+            destPlaceId: nearest ? nearest.p.id : `biz:${c.businessId}`,
           };
         });
       const recentPlaces = recent.map((r) => byId.get(r.placeId)).filter((p): p is Place => !!p);
