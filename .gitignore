@@ -13,6 +13,7 @@ coverage/
 
 # Next.js
 apps/web/.next/
+apps/web/.next-*/
 apps/web/out/
 apps/web/next-env.d.ts
 
