@@ -1760,7 +1760,7 @@ export function createAdminService(db: Db) {
       if (!c) throw new Error('Không tìm thấy chiến dịch');
       if (c.status !== 'active') throw new Error('Chiến dịch không chạy');
       const b = await db.get('businesses', c.businessId);
-      await db.update('campaigns', id, { status: 'paused' });
+      await db.update('campaigns', id, { status: 'paused', pausedBy: 'frego' });
       await db.insert('campaign_events', { campaignId: id, at: nowIso(), text: `${EV_STOP}${why}` });
       await log(`Tạm dừng chiến dịch ${c.name}, ${b?.name ?? ''}: ${why}`);
     },
@@ -1772,7 +1772,7 @@ export function createAdminService(db: Db) {
       if (c.status !== 'paused') throw new Error('Chiến dịch không ở trạng thái tạm dừng');
       const b = await db.get('businesses', c.businessId);
       if (!b || b.status !== 'active') throw new Error('Doanh nghiệp đang bị khóa');
-      await db.update('campaigns', id, { status: 'active' });
+      await db.update('campaigns', id, { status: 'active', pausedBy: null });
       await db.insert('campaign_events', { campaignId: id, at: nowIso(), text: EV_RESUME });
       await log(`Cho chạy lại chiến dịch ${c.name}, ${b.name}`);
     },

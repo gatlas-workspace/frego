@@ -169,6 +169,22 @@ do $$ begin
   raise exception 'chủ quán không được tự duyệt';
 exception when insufficient_privilege then null;
 end $$;
+-- Không tự chạy lại chiến dịch Frego đã dừng.
+do $$ begin
+  update public.campaigns set status = 'paused', paused_by = 'frego' where id = 'cp-may-chieu';
+exception when others then null;
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+update public.campaigns set status = 'paused', paused_by = 'frego' where id = 'cp-may-chieu';
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000b1'); end $$;
+do $$ begin
+  update public.campaigns set status = 'active' where id = 'cp-may-chieu';
+  raise exception 'chủ quán không được chạy lại chiến dịch Frego đã dừng';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+update public.campaigns set status = 'active', paused_by = null where id = 'cp-may-chieu';
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000b1'); end $$;
 -- Không tự sửa số dư ví.
 do $$ begin
   update public.businesses set wallet_balance = 99999999;

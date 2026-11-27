@@ -575,7 +575,7 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       return b;
     },
 
-    review_business({ businessId, approve }) {
+    review_business({ businessId, approve, reason }) {
       const b = find('businesses', businessId);
       if (!b) throw new Error('Không tìm thấy doanh nghiệp');
       b.status = approve ? 'active' : 'rejected';
@@ -583,7 +583,7 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         id: uid(),
         actorName: 'Vận hành Frego',
         actorRole: 'ops',
-        action: `${approve ? 'Duyệt' : 'Từ chối'} doanh nghiệp ${b.name}`,
+        action: `${approve ? 'Duyệt' : 'Từ chối'} doanh nghiệp ${b.name}${!approve && reason ? `, lý do ${reason}` : ''}`,
         createdAt: now().toISOString(),
       });
       return b;
@@ -593,7 +593,14 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       const b = find('businesses', businessId);
       if (!b) throw new Error('Không tìm thấy doanh nghiệp');
       b.status = status;
-      if (status === 'locked') for (const c of data.campaigns) if (c.businessId === b.id && c.status === 'active') c.status = 'paused';
+      if (status === 'locked') {
+        for (const c of data.campaigns) {
+          if (c.businessId === b.id && c.status === 'active') {
+            c.status = 'paused';
+            c.pausedBy = 'frego';
+          }
+        }
+      }
       data.audit_logs.push({
         id: uid(),
         actorName: 'Vận hành Frego',

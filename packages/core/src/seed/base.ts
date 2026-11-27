@@ -346,6 +346,7 @@ export const businessMembers: BusinessMember[] = [
 const camp = (c: Partial<Campaign> & Pick<Campaign, 'id' | 'businessId' | 'name' | 'providerId' | 'vehicleClass' | 'amount'>): Campaign => ({
   status: 'active',
   rejectReason: null,
+  pausedBy: null,
   radiusM: 500,
   hoursFrom: '07:00',
   hoursTo: '22:00',
@@ -386,6 +387,7 @@ export const campaigns: Campaign[] = [
     businessId: 'biz-cafe-may',
     name: 'Xe máy cuối tuần',
     status: 'paused',
+    pausedBy: 'business',
     providerId: 'be',
     vehicleClass: 'bike',
     amount: 10000,

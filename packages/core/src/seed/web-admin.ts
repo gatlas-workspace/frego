@@ -147,6 +147,7 @@ const campRow = (c: CampInput): Campaign => {
   return {
     status: 'active',
     rejectReason: null,
+    pausedBy: c.status === 'paused' ? 'business' : null,
     hoursFrom: '07:00',
     hoursTo: '22:00',
     onlyOpenHours: true,
@@ -200,7 +201,7 @@ const extraCampaigns: Campaign[] = [
   // Doanh nghiệp tự tạm dừng
   campRow({ id: 'cp-qt-sau-toi', businessId: 'biz-qt-com-nha-sau', name: 'Cơm tối công nhân', status: 'paused', providerId: 'be', vehicleClass: 'bike', amount: 5000, radiusM: 1000, budget: 1000000, used: 21, issued: 120 }),
   // Tiệm nail Xinh (tạm khóa): chiến dịch bị Frego dừng vì bị báo lỗi.
-  campRow({ id: 'cp-qt-xinh-noel', businessId: 'biz-qt-nail-xinh', name: 'Ưu đãi Noel', status: 'paused', providerId: 'grab', vehicleClass: 'bike', amount: 10000, radiusM: 500, budget: 3000000, used: 41, issued: 300, endsAt: vn('2026-12-25 23:59') }),
+  campRow({ id: 'cp-qt-xinh-noel', businessId: 'biz-qt-nail-xinh', name: 'Ưu đãi Noel', status: 'paused', pausedBy: 'frego', providerId: 'grab', vehicleClass: 'bike', amount: 10000, radiusM: 500, budget: 3000000, used: 41, issued: 300, endsAt: vn('2026-12-25 23:59') }),
 ];
 
 const extraCampaignEvents: CampaignEvent[] = [

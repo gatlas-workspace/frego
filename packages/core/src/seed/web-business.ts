@@ -19,6 +19,7 @@ export const businessSeed: Partial<Seed> = {
       name: 'Thử nghiệm tháng 10',
       status: 'ended',
       rejectReason: null,
+      pausedBy: null,
       providerId: 'grab',
       vehicleClass: 'bike',
       amount: 10000,

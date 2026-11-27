@@ -954,7 +954,7 @@ export function createBusinessService(db: Db, businessId: string) {
         statusTone: st.tone,
         subtitle: [dateRange(c.startsAt, c.endsAt), `${c.hoursFrom}–${c.hoursTo}`, service, `${formatMeters(c.radiusM)} quanh quán`].join(' · '),
         canPause: manage && c.status === 'active',
-        canResume: manage && c.status === 'paused' && !!c.approvedAt,
+        canResume: manage && c.status === 'paused' && !!c.approvedAt && c.pausedBy !== 'frego',
         canEditBudget: manage && c.status !== 'ended' && c.status !== 'rejected',
         resubmitHref: manage && (c.status === 'rejected' || c.status === 'draft') ? `/doanh-nghiep/chien-dich/tao?tu=${c.id}` : null,
         rejectReason: c.status === 'rejected' ? c.rejectReason : null,
@@ -998,7 +998,13 @@ export function createBusinessService(db: Db, businessId: string) {
       const c = await ownCampaign(id);
       if (paused && c.status !== 'active') throw new BizServiceError('Chỉ tạm dừng được chiến dịch đang chạy.');
       if (!paused && (c.status !== 'paused' || !c.approvedAt)) throw new BizServiceError('Chiến dịch này chưa chạy tiếp được.');
-      const campaign = await db.update('campaigns', id, { status: paused ? 'paused' : 'active' });
+      if (!paused && c.pausedBy === 'frego') {
+        throw new BizServiceError('Frego đang tạm dừng chiến dịch này. Liên hệ Frego để được xem xét chạy lại.');
+      }
+      const campaign = await db.update('campaigns', id, {
+        status: paused ? 'paused' : 'active',
+        pausedBy: paused ? 'business' : null,
+      });
       await addEvent(id, paused ? 'Tạm dừng' : 'Tiếp tục chạy');
       return {
         campaign,
@@ -1142,6 +1148,7 @@ export function createBusinessService(db: Db, businessId: string) {
         ...fields,
         status,
         rejectReason: null,
+        pausedBy: null,
         spent: 0,
         issuedCount: 0,
         usedCount: 0,

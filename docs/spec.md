@@ -56,7 +56,7 @@ Cộng thêm: landing page cho người đặt xe (cùng màu, font, thành ph�
 - **Ưu đãi chiến dịch**: đặt điểm đến trong vùng quanh quán (bán kính 300 m–1 km), đúng khung giờ → được tặng mã riêng khi mở app hãng. Voucher tặng riêng (chủ động gửi) chỉ khi người dùng bật "Voucher tặng riêng".
 - **Tiền doanh nghiệp**: nạp trước; mỗi mã được dùng trừ giá trị giảm + 3.000đ phí dịch vụ (số mẫu, cần chốt), trừ 00:05 mỗi ngày cho mã hôm trước. Ví hết thì chiến dịch tự dừng. Mã tặng mà không dùng không mất tiền.
 - **Duyệt**: chiến dịch, doanh nghiệp mới phải được Frego duyệt (mục tiêu 1 ngày làm việc). Đổi ngân sách không cần duyệt lại; đổi hãng, mức giảm, vùng, ảnh hoặc địa chỉ quán thì duyệt lại.
-- **Điểm**: báo giá một chạm +10, nhập số tiền +50, biên nhận email +50, nơi chưa có dữ liệu ×2. Điểm không đổi ra tiền mặt. Quà: Be xe máy −10.000đ (500 điểm), Green SM −15.000đ (1.000), Grab ô tô −20.000đ (1.500).
+- **Điểm**: báo giá một chạm +10, nhập số tiền +50 (chỉ khi lệch ≤ 30% so với ước tính), biên nhận email +50, nơi chưa có dữ liệu ×2, tối đa 300 điểm mỗi người mỗi ngày (vượt thì giữ lại kiểm tra). Điểm không đổi ra tiền mặt. Quà: Be xe máy −10.000đ (500 điểm), Green SM −15.000đ (1.000), Grab ô tô −20.000đ (1.500).
 - **Mã công khai**: luôn ghi nguồn và giờ kiểm tra; ≥ 10 lượt báo "không dùng được" trong 24 giờ → tự ẩn.
 - **Thông báo**: giờ yên lặng 22:00–7:00; tin ưu đãi chung tối đa 2 tin/tuần, mặc định tắt.
 - **Quyền dữ liệu**: vị trí khi dùng app (bật), góp dữ liệu ẩn danh (tắt), voucher tặng riêng (tắt). Yêu cầu xóa dữ liệu xong trong 30 ngày.
@@ -65,7 +65,7 @@ Cộng thêm: landing page cho người đặt xe (cùng màu, font, thành ph�
 
 - [x] Dữ liệu mẫu tái tạo đúng số trong thiết kế (test `packages/core/test/user-flow.test.ts`).
 - [x] RLS bật trên mọi bảng; test từng vai trò: người dùng, chủ quán, quản trị, khách (`pnpm db:test`).
-- [ ] 24 màn app, 21 màn web, landing page giống thiết kế (so ảnh chụp).
+- [x] 24 màn app, 21 màn web, landing page giống thiết kế (so ảnh chụp).
 - [ ] Chạy được trên Supabase thật: OTP SMS, đăng nhập email cho doanh nghiệp/quản trị.
 - [ ] Analytics + UTM + sự kiện chuyển đổi chính (so giá → mở app hãng → báo giá).
 - [ ] Thử trong trình duyệt Zalo, Facebook, Safari iOS, Chrome Android.

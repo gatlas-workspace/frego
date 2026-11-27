@@ -218,6 +218,8 @@ export interface Campaign {
   name: string;
   status: CampaignStatus;
   rejectReason: string | null;
+  /** Ai tạm dừng: doanh nghiệp tự dừng (được chạy lại) hay Frego dừng (chỉ Frego cho chạy lại) */
+  pausedBy: 'business' | 'frego' | null;
   providerId: ProviderId;
   vehicleClass: VehicleClass;
   /** Mức giảm mỗi chuyến (đ) */
