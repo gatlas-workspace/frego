@@ -156,7 +156,8 @@ export function ModalSheet({ children, backdrop, onDismiss, dismissLabel = 'Đó
   const insets = useSafeAreaInsets();
   const pad: ViewStyle = { paddingTop: 10, paddingHorizontal: 20, paddingBottom: Math.max(insets.bottom, 30), gap };
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    // Phủ toàn màn (kể cả khi đặt cạnh nội dung màn hình khác): không chiếm chỗ trong bố cục cột của màn cha.
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 10, backgroundColor: backdrop ? colors.bg : 'transparent' }}>
       {backdrop ? (
         <View
           style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}

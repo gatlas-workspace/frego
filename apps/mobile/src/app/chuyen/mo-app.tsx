@@ -81,7 +81,7 @@ export default function OpenAppScreen() {
         </View>
         <View style={{ paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.bg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <T weight={600} size={13} lineHeight={18} color={colors.ink2}>
-            {hasEstimate ? 'Ước tính sau mã' : 'Giá chuyến'}
+            {hasEstimate ? (view.code ? 'Ước tính sau mã' : 'Ước tính') : 'Giá chuyến'}
           </T>
           <T weight={800} size={16} lineHeight={21} style={{ flexShrink: 1, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
             {hasEstimate ? noBreak(view.estimateText) : `Xem trong app ${name}`}

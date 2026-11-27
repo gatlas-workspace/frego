@@ -69,9 +69,12 @@ function ProfileForm({ me, topPad, onDone, fromAccount }: { me: MeView; topPad: 
   // Mã giới thiệu: chỉ khi tạo tài khoản (không hiện khi sửa từ Tài khoản), đặt cuối form để không làm phiền.
   const [refCode, setRefCode] = useState('');
   const refCheck = useReferralCheck(refCode);
+  // Chỉ hiện ô mã khi tài khoản còn nhập được (mới tạo, trong 7 ngày, chưa nhập) — tránh báo lỗi "quá 7 ngày" cho người cũ.
+  const referral = useQuery({ queryKey: ['referral'], queryFn: () => svc.getReferral(), enabled: !fromAccount });
+  const canEnterReferral = !fromAccount && !!referral.data?.canEnter;
   /** Áp dụng mã nếu hợp lệ; lỗi mã không chặn bước đăng ký (vẫn nhập lại được ở màn Giới thiệu trong 7 ngày). */
   const applyReferral = async () => {
-    if (fromAccount || refCheck.state !== 'ok') return;
+    if (!canEnterReferral || refCheck.state !== 'ok') return;
     await svc.applyReferralCode(refCode).catch(() => null);
   };
 
@@ -205,7 +208,7 @@ function ProfileForm({ me, topPad, onDone, fromAccount }: { me: MeView; topPad: 
           selected={vehicles}
           onToggle={(k) => setVehicles((l) => toggle(l, k as VehicleClass))}
         />
-        {!fromAccount ? (
+        {canEnterReferral ? (
           <ReferralCodeInput value={refCode} onChange={setRefCode} check={refCheck} hint="Bạn bè gửi mã cho bạn? Nhập để nhận điểm sau chuyến đầu." />
         ) : null}
         {saveError ? <InlineError text={saveError} /> : null}

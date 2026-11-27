@@ -11,7 +11,6 @@ import { ShopPhotoCard } from '@/components/screens/flow/ShopPhotoCard';
 import { SkeletonBackdrop } from '@/components/screens/flow/SkeletonBackdrop';
 import { VerdictTiles } from '@/components/screens/flow/VerdictTiles';
 import { refreshAll, useApi } from '@/lib/api';
-import { useGmail } from '@/lib/gmail';
 import { colors } from '@/theme/tokens';
 
 const VERDICT_TEXT: Record<PriceVerdict, string> = {
@@ -38,8 +37,6 @@ export default function ReportPriceScreen() {
   const [amountDone, setAmountDone] = useState<string | null>(null);
 
   const trip = useQuery({ queryKey: ['trip', tripId], queryFn: () => svc.getTrip(String(tripId)), enabled: !!tripId });
-  const gmail = useGmail();
-  const gmailSoon = gmail.availability === 'soon' || gmail.statusError;
 
   const tap = useMutation({
     mutationFn: (verdict: PriceVerdict) => svc.reportPrice(String(tripId), { verdict }),
@@ -176,32 +173,6 @@ export default function ReportPriceScreen() {
 
         <ShopPhotoCard tripId={String(tripId)} />
 
-        {gmailSoon ? (
-          <ListRow
-            icon="mail"
-            leadTone="neutral"
-            title="Tự lấy giá từ biên nhận email"
-            sub="Đang chờ Google duyệt. Trong lúc chờ, bạn nhập số tiền ở trên."
-            subWrap
-            chip="Sắp có"
-            chipTone="tint"
-            style={{ backgroundColor: colors.surfaceAlt, borderRadius: 20 }}
-          />
-        ) : (
-          <ListRow
-            icon="mail"
-            title="Tự lấy giá từ biên nhận email"
-            sub={
-              gmail.status?.linked
-                ? `Đã bật${gmail.availability === 'demo' ? ' (bản thử DEMO)' : ''} · ${gmail.status.email ?? 'Gmail'}`
-                : `Bật một lần, mỗi chuyến có biên nhận sẽ tự được ghi nhận.${gmail.availability === 'demo' ? ' Bản thử DEMO.' : ''}`
-            }
-            subWrap
-            trail="chev"
-            onPress={() => router.push('/lien-ket')}
-            style={{ backgroundColor: colors.surfaceAlt, borderRadius: 20 }}
-          />
-        )}
         <Button label="Xem điểm và đổi voucher" variant="text" size="md" onPress={() => router.push('/diem-thuong')} />
       </>
     );

@@ -139,7 +139,7 @@ export function MapHeader({
               lat: plan.origin.lat,
               lng: plan.origin.lng,
               // Đi từ vị trí hiện tại: chấm xanh "Vị trí của bạn" như thongtincty.
-              label: plan.origin.label === 'Vị trí hiện tại' ? 'Vị trí của bạn' : (from ?? plan.origin.label),
+              label: (from ?? plan.origin.label) === 'Vị trí hiện tại' ? 'Vị trí của bạn' : (from ?? plan.origin.label),
             }}
             dest={{ lat: plan.dest.lat, lng: plan.dest.lng, label: to ?? plan.dest.name }}
             route={routeLine.data ?? plan.route}

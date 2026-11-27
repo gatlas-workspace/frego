@@ -41,7 +41,7 @@ export function TripMapBackdrop({ vehicleClass, sponsorId }: { vehicleClass: Veh
       origin={{
         lat: plan.origin.lat,
         lng: plan.origin.lng,
-        label: plan.origin.label === 'Vị trí hiện tại' ? 'Vị trí của bạn' : originName,
+        label: originName === 'Vị trí hiện tại' ? 'Vị trí của bạn' : originName,
       }}
       dest={{ lat: plan.dest.lat, lng: plan.dest.lng, label: plan.dest.name }}
       route={routeLine.data ?? plan.route}

@@ -9,16 +9,26 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PushHost } from '@/components/PushHost';
-import { ApiProvider } from '@/lib/api';
+import { ApiProvider, useApi } from '@/lib/api';
 import { PickupProvider } from '@/lib/pickup';
 import { PushProvider } from '@/lib/push';
 import { TripFlowProvider } from '@/lib/trip-flow';
 import { colors } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/**
+ * Chờ biết đã đăng nhập hay chưa (và dữ liệu demo trên máy đã nạp xong) rồi mới dựng màn hình.
+ * Không có bước này, mở thẳng một link (VD bấm thông báo → /bao-gia/<id> lúc app vừa mở) sẽ đọc dữ liệu trước khi nạp
+ * và báo "Không tìm thấy chuyến".
+ */
+function WhenApiReady({ children }: { children: ReactNode }) {
+  const { status } = useApi();
+  return status === 'loading' ? null : <>{children}</>;
+}
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -36,6 +46,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ApiProvider>
+        <WhenApiReady>
         <TripFlowProvider>
           <PickupProvider>
           <PushProvider>
@@ -49,6 +60,7 @@ export default function RootLayout() {
           </PushProvider>
           </PickupProvider>
         </TripFlowProvider>
+        </WhenApiReady>
       </ApiProvider>
     </SafeAreaProvider>
   );

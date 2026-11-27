@@ -160,6 +160,9 @@ function Welcome({ phone }: { phone: string }) {
   const insets = useSafeAreaInsets();
   const { svc } = useApi();
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: () => svc.getWallet() });
+  // Người đã điền thông tin trước đó (đăng nhập lại): chào "trở lại" và về thẳng Trang chủ, không bắt đi lại các bước đăng ký.
+  const me = useQuery({ queryKey: ['me'], queryFn: () => svc.getMe() });
+  const returning = !!me.data?.profile.onboardedAt;
   const gift = wallet.data?.gifts.find((g) => g.source === 'frego' && g.title === `Mã ${brand.welcomeCode}`);
 
   return (
@@ -184,7 +187,7 @@ function Welcome({ phone }: { phone: string }) {
             <Icon name="check" size={34} color={colors.white} strokeWidth={2.6} />
           </View>
         </View>
-        <PageHeading title={`Chào mừng bạn đến ${brand.name}!`} align="center" style={{ alignSelf: 'stretch' }}>
+        <PageHeading title={returning ? 'Chào mừng bạn trở lại!' : `Chào mừng bạn đến ${brand.name}!`} align="center" style={{ alignSelf: 'stretch' }}>
           {phone ? (
             <>
               Đăng nhập thành công với số <Strong>{keepTogether(phone)}</Strong>.
@@ -196,7 +199,7 @@ function Welcome({ phone }: { phone: string }) {
         <View style={{ alignSelf: 'stretch', marginTop: 8 }}>
           {wallet.isLoading ? (
             <LoadingView label="Đang mở quà chào mừng…" style={{ paddingVertical: 24 }} />
-          ) : gift ? (
+          ) : gift && !returning ? (
             <VoucherTicket
               mode="static"
               logo="f"
@@ -211,7 +214,7 @@ function Welcome({ phone }: { phone: string }) {
         </View>
       </ScrollView>
       <BottomBar>
-        <Button label="Tiếp tục" onPress={() => resetTo('/thong-tin')} />
+        <Button label="Tiếp tục" onPress={() => resetTo(returning ? '/' : '/thong-tin')} disabled={me.isPending} />
       </BottomBar>
     </View>
   );
