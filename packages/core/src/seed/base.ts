@@ -200,15 +200,15 @@ export const recentSearches: RecentSearch[] = [
 /* ───────────── Đối tác liên kết ───────────── */
 
 export const partners: Partner[] = [
-  { id: 'vpb', kind: 'bank', name: 'VPBank', mono: 'VP', description: 'Thẻ tín dụng · hợp mã VPBTRANSPORT', integration: 'record_only', order: 1 },
-  { id: 'klb', kind: 'bank', name: 'KienLongBank', mono: 'KL', description: 'Liên kết để mở mã KLBIKE cho GrabBike', linkedDescription: 'Hợp mã KLBIKE cho GrabBike', integration: 'record_only', order: 2 },
-  { id: 'momo', kind: 'wallet', name: 'MoMo', mono: 'Mo', description: 'Hợp mã đặt xe trả bằng MoMo', integration: 'record_only', order: 3 },
-  { id: 'zalo', kind: 'wallet', name: 'ZaloPay', mono: 'Za', description: 'Hợp mã đặt xe trả bằng ZaloPay', integration: 'record_only', order: 4 },
-  { id: 'shopee', kind: 'wallet', name: 'ShopeePay', mono: 'Sh', description: 'Hợp mã đặt xe trả bằng ShopeePay', integration: 'record_only', order: 5 },
-  { id: 'be', kind: 'app', name: 'Be', mono: 'Be', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', order: 6 },
-  { id: 'grab', kind: 'app', name: 'Grab', mono: 'Gr', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', order: 7 },
-  { id: 'gsm', kind: 'app', name: 'Green SM', mono: 'GS', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', order: 8 },
-  { id: 'gmail', kind: 'email', name: 'Gmail', mono: 'Gm', description: 'Đọc biên nhận chuyến đi để tự báo giá', integration: 'planned', order: 9 },
+  { id: 'vpb', kind: 'bank', name: 'VPBank', mono: 'VP', description: 'Thẻ tín dụng · hợp mã VPBTRANSPORT', integration: 'record_only', sortOrder: 1 },
+  { id: 'klb', kind: 'bank', name: 'KienLongBank', mono: 'KL', description: 'Liên kết để mở mã KLBIKE cho GrabBike', linkedDescription: 'Hợp mã KLBIKE cho GrabBike', integration: 'record_only', sortOrder: 2 },
+  { id: 'momo', kind: 'wallet', name: 'MoMo', mono: 'Mo', description: 'Hợp mã đặt xe trả bằng MoMo', integration: 'record_only', sortOrder: 3 },
+  { id: 'zalo', kind: 'wallet', name: 'ZaloPay', mono: 'Za', description: 'Hợp mã đặt xe trả bằng ZaloPay', integration: 'record_only', sortOrder: 4 },
+  { id: 'shopee', kind: 'wallet', name: 'ShopeePay', mono: 'Sh', description: 'Hợp mã đặt xe trả bằng ShopeePay', integration: 'record_only', sortOrder: 5 },
+  { id: 'be', kind: 'app', name: 'Be', mono: 'Be', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', sortOrder: 6 },
+  { id: 'grab', kind: 'app', name: 'Grab', mono: 'Gr', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', sortOrder: 7 },
+  { id: 'gsm', kind: 'app', name: 'Green SM', mono: 'GS', description: 'Biết khi mã được dùng để nhắc báo giá', integration: 'planned', sortOrder: 8 },
+  { id: 'gmail', kind: 'email', name: 'Gmail', mono: 'Gm', description: 'Đọc biên nhận chuyến đi để tự báo giá', integration: 'planned', sortOrder: 9 },
 ];
 
 export const linkedAccounts: LinkedAccount[] = [

@@ -1,4 +1,4 @@
-import type { Seed, TableName } from '../db/schema';
+import type { BaseTableName, Seed } from '../db/schema';
 import * as base from './base';
 import { businessSeed } from './web-business';
 import { adminSeed } from './web-admin';
@@ -44,7 +44,7 @@ const empty = (): Seed => ({
 export function createSeed(): Seed {
   const s = empty();
   const add = (part: Partial<Seed>) => {
-    for (const [k, rows] of Object.entries(part) as [TableName, unknown[]][]) {
+    for (const [k, rows] of Object.entries(part) as [BaseTableName, unknown[]][]) {
       if (rows) (s[k] as unknown[]).push(...rows);
     }
   };

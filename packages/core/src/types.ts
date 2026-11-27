@@ -149,7 +149,7 @@ export interface Partner {
   linkedDescription?: string;
   /** Có thỏa thuận tích hợp thật hay chỉ ghi nhận */
   integration: 'live' | 'record_only' | 'planned';
-  order: number;
+  sortOrder: number;
 }
 
 export interface LinkedAccount {
@@ -195,6 +195,12 @@ export interface Business {
   joinedAt: ISODate;
 }
 
+/** Thông tin quán ai cũng xem được (view businesses_public): không có ví, mã số thuế, liên hệ. */
+export type BusinessPublic = Pick<
+  Business,
+  'id' | 'name' | 'category' | 'industry' | 'landmark' | 'address' | 'district' | 'lat' | 'lng' | 'openHours' | 'status' | 'logoUrl'
+>;
+
 export interface BusinessMember {
   id: string;
   businessId: string;
@@ -233,6 +239,15 @@ export interface Campaign {
   approvedAt: ISODate | null;
   createdAt: ISODate;
 }
+
+/** Chiến dịch ai cũng xem được (view campaigns_public): không có ngân sách, số đã chi. */
+export type CampaignPublic = Pick<
+  Campaign,
+  'id' | 'businessId' | 'name' | 'status' | 'providerId' | 'vehicleClass' | 'amount' | 'radiusM' | 'hoursFrom' | 'hoursTo' | 'startsAt' | 'endsAt' | 'imageUrl'
+> & {
+  /** Đang phát mã: đang chạy, còn ngân sách, trong thời gian chạy */
+  offering: boolean;
+};
 
 export interface CampaignEvent {
   id: string;

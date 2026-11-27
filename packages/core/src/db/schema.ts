@@ -8,6 +8,8 @@ import type {
   Broadcast,
   Business,
   BusinessMember,
+  BusinessPublic,
+  CampaignPublic,
   Campaign,
   CampaignEvent,
   CodeVote,
@@ -76,6 +78,10 @@ export interface Tables {
   audit_logs: AuditLog;
   broadcasts: Broadcast;
   stats: StatRow;
+  /** View chỉ đọc: thông tin quán công khai */
+  businesses_public: BusinessPublic;
+  /** View chỉ đọc: chiến dịch công khai (không có ngân sách) */
+  campaigns_public: CampaignPublic;
 }
 
 export type TableName = keyof Tables;
@@ -110,6 +116,10 @@ export const PRIMARY_KEYS: { [K in TableName]: keyof Tables[K] & string } = {
   audit_logs: 'id',
   broadcasts: 'id',
   stats: 'id',
+  businesses_public: 'id',
+  campaigns_public: 'id',
 };
 
-export type Seed = { [K in TableName]: Tables[K][] };
+/** Bảng thật (không gồm view). */
+export type BaseTableName = Exclude<TableName, 'businesses_public' | 'campaigns_public'>;
+export type Seed = { [K in BaseTableName]: Tables[K][] };

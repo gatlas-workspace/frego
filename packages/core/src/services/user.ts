@@ -36,8 +36,8 @@ import { isPeak } from '../pricing';
 import type {
   AppNotification,
   AttachedCode,
-  Business,
-  Campaign,
+  BusinessPublic,
+  CampaignPublic,
   CategoryKey,
   Consents,
   NotificationPrefs,
@@ -342,16 +342,13 @@ export function createUserService(db: Db) {
     return new Map(all.map((p) => [p.id, p]));
   }
 
-  async function activeCampaigns(): Promise<(Campaign & { business: Business })[]> {
+  async function activeCampaigns(): Promise<(CampaignPublic & { business: BusinessPublic })[]> {
     const [camps, bizs] = await Promise.all([
-      db.list('campaigns', { where: { status: 'active' } }),
-      db.list('businesses', { where: { status: 'active' } }),
+      db.list('campaigns_public', { where: { offering: true } }),
+      db.list('businesses_public', { where: { status: 'active' } }),
     ]);
     const byId = new Map(bizs.map((b) => [b.id, b]));
-    const t = db.now().getTime();
-    return camps
-      .filter((c) => byId.has(c.businessId) && new Date(c.endsAt).getTime() > t && c.spent < c.budget)
-      .map((c) => ({ ...c, business: byId.get(c.businessId)! }));
+    return camps.filter((c) => byId.has(c.businessId)).map((c) => ({ ...c, business: byId.get(c.businessId)! }));
   }
 
   /** Vị trí hiện tại. DEMO: gần Landmark 81 (khớp thiết kế). */
@@ -360,7 +357,7 @@ export function createUserService(db: Db) {
     return { label: 'Vị trí hiện tại', placeId: 'landmark81', lat: lm?.lat ?? 10.7949, lng: lm?.lng ?? 106.7219 };
   }
 
-  function countVouchersFor(place: Place, camps: (Campaign & { business: Business })[]) {
+  function countVouchersFor(place: Place, camps: (CampaignPublic & { business: BusinessPublic })[]) {
     return camps.filter((c) => distanceM(place, c.business) <= c.radiusM).length;
   }
 
@@ -714,7 +711,7 @@ export function createUserService(db: Db) {
       const origin = await currentOrigin();
       let dest: Place | null;
       if (destId.startsWith('biz:')) {
-        const b = await db.get('businesses', destId.slice(4));
+        const b = await db.get('businesses_public', destId.slice(4));
         dest = b ? { id: destId, name: b.name, address: b.address, district: b.district, lat: b.lat, lng: b.lng } : null;
       } else {
         dest = await db.get('places', destId);
@@ -890,8 +887,8 @@ export function createUserService(db: Db) {
     async getWallet(): Promise<WalletView> {
       const [vouchers, camps, bizs, codes, partners, linked] = await Promise.all([
         myVouchers(),
-        db.list('campaigns'),
-        db.list('businesses'),
+        db.list('campaigns_public'),
+        db.list('businesses_public'),
         db.list('public_codes', { where: { status: 'live' } }),
         db.list('partners'),
         linkedPartnerIds(),
@@ -965,8 +962,8 @@ export function createUserService(db: Db) {
     async getVoucher(id: string): Promise<VoucherDetailView | null> {
       const v = await db.get('user_vouchers', id);
       if (!v || v.userId !== me()) return null;
-      const c = v.campaignId ? await db.get('campaigns', v.campaignId) : null;
-      const b = c ? await db.get('businesses', c.businessId) : null;
+      const c = v.campaignId ? await db.get('campaigns_public', v.campaignId) : null;
+      const b = c ? await db.get('businesses_public', c.businessId) : null;
       const svc = serviceFullLabel(v.providerId, v.vehicleClass);
       const radius = c ? formatMeters(c.radiusM) : '';
       return {
@@ -1124,7 +1121,7 @@ export function createUserService(db: Db) {
     /* ───── Liên kết ───── */
 
     async getLinks(): Promise<{ cards: LinkRowView[]; wallets: LinkRowView[]; apps: LinkRowView[]; count: number }> {
-      const [partners, linked] = await Promise.all([db.list('partners', { order: { column: 'order' } }), linkedPartnerIds()]);
+      const [partners, linked] = await Promise.all([db.list('partners', { order: { column: 'sortOrder' } }), linkedPartnerIds()]);
       const row = (p: Partner): LinkRowView => ({
         partnerId: p.id,
         kind: p.kind,

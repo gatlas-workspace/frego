@@ -1,0 +1,38 @@
+# Cấu hình Supabase CLI cho môi trường local (supabase start). Môi trường thật cấu hình trên dashboard.
+project_id = "frego"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 16
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000", "frego://"]
+enable_anonymous_sign_ins = true
+enable_signup = true
+
+[auth.sms]
+# Đăng nhập app bằng OTP số điện thoại. Cần nhà cung cấp SMS (Twilio, eSMS…) trên môi trường thật.
+enable_signup = true
+enable_confirmations = true
+template = "Mã đăng nhập Frego của bạn là {{ .Code }}"
+max_frequency = "60s"
+
+[auth.sms.test_otp]
+# OTP cố định cho số điện thoại mẫu (chỉ local).
+84909555123 = "482913"
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

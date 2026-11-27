@@ -8,7 +8,7 @@ import { formatDiscount, formatNumber, formatVnd } from '../format';
 import { POINTS_RULES } from '../catalog';
 import { DEMO_NOW } from '../seed/base';
 import type { Db, ListOptions, RpcName, Rpcs } from './types';
-import { PRIMARY_KEYS, type Row, type Seed, type TableName } from './schema';
+import { PRIMARY_KEYS, type BaseTableName, type Row, type Seed, type TableName } from './schema';
 import type { AppNotification, Trip, UserVoucher } from '../types';
 
 export function uid(): string {
@@ -66,8 +66,61 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
   const changed = () => opts.onChange?.(data);
 
   const pk = <T extends TableName>(t: T) => PRIMARY_KEYS[t] as keyof Row<T>;
+
+  /** Bảng thật hoặc view chỉ đọc (giống view SQL businesses_public, campaigns_public). */
+  function rowsOf<T extends TableName>(t: T): Row<T>[] {
+    if (t === 'businesses_public') {
+      return data.businesses
+        .filter((b) => b.status === 'active' || b.status === 'locked')
+        .map((b) => ({
+          id: b.id,
+          name: b.name,
+          category: b.category,
+          industry: b.industry,
+          landmark: b.landmark,
+          address: b.address,
+          district: b.district,
+          lat: b.lat,
+          lng: b.lng,
+          openHours: b.openHours,
+          status: b.status,
+          logoUrl: b.logoUrl,
+        })) as unknown as Row<T>[];
+    }
+    if (t === 'campaigns_public') {
+      const nowT = now().getTime();
+      return data.campaigns
+        .filter((c) => c.status === 'active' || c.status === 'paused' || c.status === 'ended')
+        .map((c) => ({
+          id: c.id,
+          businessId: c.businessId,
+          name: c.name,
+          status: c.status,
+          providerId: c.providerId,
+          vehicleClass: c.vehicleClass,
+          amount: c.amount,
+          radiusM: c.radiusM,
+          hoursFrom: c.hoursFrom,
+          hoursTo: c.hoursTo,
+          startsAt: c.startsAt,
+          endsAt: c.endsAt,
+          imageUrl: c.imageUrl,
+          offering:
+            c.status === 'active' &&
+            c.spent < c.budget &&
+            new Date(c.startsAt).getTime() <= nowT &&
+            new Date(c.endsAt).getTime() > nowT,
+        })) as unknown as Row<T>[];
+    }
+    return (data as unknown as Record<string, Row<T>[]>)[t];
+  }
+  const isView = (t: TableName) => t === 'businesses_public' || t === 'campaigns_public';
+  const base = <T extends TableName>(t: T): Row<T>[] => {
+    if (isView(t)) throw new Error(`${t} là view chỉ đọc`);
+    return (data as unknown as Record<string, Row<T>[]>)[t as BaseTableName];
+  };
   const find = <T extends TableName>(t: T, id: string) =>
-    (data[t] as Row<T>[]).find((r) => (r[pk(t)] as unknown as string) === id) ?? null;
+    rowsOf(t).find((r) => (r[pk(t)] as unknown as string) === id) ?? null;
 
   const db: MemoryDb = {
     mode: 'demo',
@@ -80,7 +133,7 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
     now,
 
     async list<T extends TableName>(table: T, o: ListOptions<Row<T>> = {}) {
-      let rows = (data[table] as Row<T>[]).slice();
+      let rows = rowsOf(table).slice();
       if (o.where) {
         const entries = Object.entries(o.where) as [keyof Row<T>, unknown][];
         rows = rows.filter((r) => entries.every(([k, v]) => r[k] === v));
@@ -111,12 +164,13 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       const key = pk(table);
       const full = { ...row } as Row<T>;
       if (!full[key]) (full as unknown as Record<string, unknown>)[key as string] = uid();
-      (data[table] as Row<T>[]).push(full);
+      base(table).push(full);
       changed();
       return clone(full);
     },
 
     async update<T extends TableName>(table: T, id: string, patch: Partial<Row<T>>) {
+      if (isView(table)) throw new Error(`${table} là view chỉ đọc`);
       const r = find(table, id);
       if (!r) throw new Error(`Không tìm thấy ${table}/${id}`);
       Object.assign(r, patch);
@@ -125,7 +179,7 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
     },
 
     async remove<T extends TableName>(table: T, id: string) {
-      const list = data[table] as Row<T>[];
+      const list = base(table);
       const i = list.findIndex((r) => (r[pk(table)] as unknown as string) === id);
       if (i >= 0) list.splice(i, 1);
       changed();
@@ -451,6 +505,84 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         b.walletBalance += tx.amount;
       }
       return { balance: b.walletBalance };
+    },
+
+    register_business(a) {
+      const u = requireUser();
+      const t = now().toISOString();
+      const b = {
+        id: uid(),
+        name: a.name,
+        legalName: a.legalName ?? '',
+        taxCode: a.taxCode ?? '',
+        representative: a.representative ?? '',
+        category: a.category ?? 'cafe',
+        industry: a.industry ?? '',
+        address: a.address ?? '',
+        district: a.district ?? '',
+        landmark: a.landmark ?? '',
+        lat: a.lat ?? 10.7769,
+        lng: a.lng ?? 106.7009,
+        openHours: { weekdays: '07:00 – 22:00', saturday: '07:00 – 22:00', sunday: '07:00 – 22:00' },
+        status: a.draft ? ('draft' as const) : ('pending' as const),
+        walletBalance: 0,
+        autoTopup: { enabled: false, amount: 2000000, threshold: 500000 },
+        invoiceName: a.legalName ?? '',
+        invoiceEmail: a.contactEmail ?? '',
+        contactEmail: a.contactEmail ?? '',
+        contactPhone: a.contactPhone ?? '',
+        logoUrl: null,
+        storefrontVerified: false,
+        transferCode: 'FREGO ' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+        notifyPrefs: { review: true, lowBalance: true, weekly: true },
+        joinedAt: t,
+      };
+      data.businesses.push(b);
+      data.business_members.push({ id: uid(), businessId: b.id, userId: u, email: a.contactEmail ?? '', role: 'owner', invitedAt: t });
+      return b;
+    },
+
+    review_business({ businessId, approve }) {
+      const b = find('businesses', businessId);
+      if (!b) throw new Error('Không tìm thấy doanh nghiệp');
+      b.status = approve ? 'active' : 'rejected';
+      data.audit_logs.push({
+        id: uid(),
+        actorName: 'Vận hành Frego',
+        actorRole: 'ops',
+        action: `${approve ? 'Duyệt' : 'Từ chối'} doanh nghiệp ${b.name}`,
+        createdAt: now().toISOString(),
+      });
+      return b;
+    },
+
+    set_business_status({ businessId, status, reason }) {
+      const b = find('businesses', businessId);
+      if (!b) throw new Error('Không tìm thấy doanh nghiệp');
+      b.status = status;
+      if (status === 'locked') for (const c of data.campaigns) if (c.businessId === b.id && c.status === 'active') c.status = 'paused';
+      data.audit_logs.push({
+        id: uid(),
+        actorName: 'Vận hành Frego',
+        actorRole: 'ops',
+        action: `${status === 'locked' ? 'Tạm khóa' : 'Mở khóa'} ${b.name}${reason ? `, lý do ${reason}` : ''}`,
+        createdAt: now().toISOString(),
+      });
+      return b;
+    },
+
+    set_user_status({ userId: target, status, reason }) {
+      const p = profile(target);
+      p.status = status;
+      p.lockReason = status === 'locked' ? (reason ?? null) : null;
+      data.audit_logs.push({
+        id: uid(),
+        actorName: 'Vận hành Frego',
+        actorRole: 'ops',
+        action: `${status === 'locked' ? 'Tạm khóa' : 'Mở khóa'} ${p.displayName}${reason ? `, lý do ${reason}` : ''}`,
+        createdAt: now().toISOString(),
+      });
+      return p;
     },
 
     adjust_points({ userId: target, delta, reason }) {

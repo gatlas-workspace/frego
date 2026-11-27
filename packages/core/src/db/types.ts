@@ -8,6 +8,9 @@ import type { Row, TableName } from './schema';
 import type {
   AppNotification,
   AttachedCode,
+  Business,
+  CategoryKey,
+  Profile,
   PriceVerdict,
   ServiceKey,
   Trip,
@@ -56,6 +59,33 @@ export interface Rpcs {
   confirm_topup: { args: { transactionId: string }; result: { balance: number } };
   /** Quản trị: cộng/trừ điểm thủ công (ghi nhật ký). */
   adjust_points: { args: { userId: string; delta: number; reason: string }; result: { points: number } };
+  /** Đăng ký doanh nghiệp (DN 0): tạo hồ sơ chờ duyệt, người gửi là chủ cửa hàng. */
+  register_business: {
+    args: {
+      name: string;
+      legalName?: string;
+      taxCode?: string;
+      representative?: string;
+      category?: CategoryKey;
+      industry?: string;
+      address?: string;
+      district?: string;
+      landmark?: string;
+      lat?: number;
+      lng?: number;
+      contactEmail?: string;
+      contactPhone?: string;
+      /** Lưu nháp thay vì gửi duyệt */
+      draft?: boolean;
+    };
+    result: Business;
+  };
+  /** Quản trị: duyệt / từ chối hồ sơ doanh nghiệp. */
+  review_business: { args: { businessId: string; approve: boolean; reason?: string }; result: Business };
+  /** Quản trị: tạm khóa / mở khóa doanh nghiệp (khóa thì dừng chiến dịch đang chạy). */
+  set_business_status: { args: { businessId: string; status: 'active' | 'locked'; reason?: string }; result: Business };
+  /** Quản trị: tạm khóa / mở khóa người dùng. */
+  set_user_status: { args: { userId: string; status: 'active' | 'locked'; reason?: string }; result: Profile };
 }
 
 export type RpcName = keyof Rpcs;
