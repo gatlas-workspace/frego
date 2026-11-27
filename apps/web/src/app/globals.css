@@ -88,3 +88,169 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ======================================================================
+ * LANDING (trang giới thiệu `/`, /quyen-rieng-tu, /dieu-khoan) và thành phần
+ * app bản web (src/components/app). Khối này chỉ BỔ SUNG token, không sửa
+ * token ở trên. Giá trị lấy từ LandingFrego.dc.html và các Ui*.dc.html.
+ * ==================================================================== */
+@theme {
+  /* Viền nút phụ, chip loại xe */
+  --color-app-outline: #dadde8;
+  /* Vòng trang trí trên nền tím */
+  --color-app-glow: #4b49e0;
+  --color-app-glow-2: #5a58ea;
+  /* Lớp trắng trong suốt trên nền tím (nền icon, rãnh thanh tiến độ, viền nút) */
+  --color-app-on-primary-fill: rgba(255, 255, 255, 0.14);
+  --color-app-on-primary-track: rgba(255, 255, 255, 0.28);
+  --color-app-on-primary-line: rgba(255, 255, 255, 0.7);
+  /* Nền khối điểm thưởng, gạch nối vé voucher */
+  --color-app-deal-tint: #fff6ee;
+  --color-app-deal-dash: #e8b48f;
+  /* Dấu "đã liên kết", nhãn "Đang chạy" */
+  --color-app-ok: #1f7a45;
+  --color-app-live: #e3f5e9;
+  --color-app-live-ink: #1f6b3a;
+  /* Cột biểu đồ nhỏ, viền khung điện thoại, viền nhãn "Tài trợ" */
+  --color-app-bar: #c9c8f6;
+  --color-app-bezel: #2a2c48;
+  --color-app-tag-line: #8e92a6;
+
+  /* Logo quán trên vé voucher */
+  --color-app-logo-cup: #6b4226;
+  --color-app-logo-bowl: #b4442b;
+  --color-app-logo-lotus: #2f6b4f;
+  --color-app-logo-gym: #1f6b5c;
+  --color-app-logo-book: #2d5a88;
+  --color-app-logo-cake: #a8522a;
+
+  /* Hình minh hoạ xe (UiVehicleTile, UiPriceRow) và ô logo hãng */
+  --color-app-veh-grab: #02b150;
+  --color-app-veh-be: #ffd21f;
+  --color-app-veh-gsm: #00b8d9;
+  --color-app-veh-other: #5b59e6;
+  --color-app-veh-tire: #23263f;
+  --color-app-veh-hub: #d9dce6;
+  --color-app-veh-glass: #dce3f5;
+  --color-app-veh-light: #ffd27a;
+  --color-app-veh-tail: #ff8a65;
+  --color-app-veh-shadow: rgba(20, 21, 43, 0.1);
+
+  --radius-app-ticket: 22px;
+
+  /* Bóng đổ */
+  --shadow-app-soft: 0 1px 2px rgba(20, 21, 43, 0.06), 0 6px 14px -8px rgba(41, 43, 120, 0.3);
+  --shadow-app-logo: 0 6px 14px -6px rgba(61, 59, 212, 0.7);
+  --shadow-app-step: 0 10px 20px -10px rgba(61, 59, 212, 0.8);
+  --shadow-app-dark: 0 10px 24px -12px rgba(20, 21, 43, 0.55);
+  --shadow-app-phone: 0 40px 80px -30px rgba(20, 21, 43, 0.55), inset 0 0 0 2px var(--color-app-bezel);
+  --shadow-app-biz: 0 30px 60px -30px rgba(154, 52, 18, 0.45);
+  --shadow-app-brand: 0 2px 6px rgba(20, 21, 43, 0.14);
+  --shadow-app-brand-strong: 0 2px 6px rgba(20, 21, 43, 0.18);
+  /* Viền vẽ bằng bóng trong (không đổi kích thước phần tử) */
+  --shadow-app-ring: inset 0 0 0 1px var(--color-app-line);
+  --shadow-app-ring-strong: inset 0 0 0 1.5px var(--color-app-outline);
+  --shadow-app-ring-chip: inset 0 0 0 1px var(--color-app-outline);
+  --shadow-app-ring-white: inset 0 0 0 1.5px var(--color-app-on-primary-line);
+  --shadow-app-line-top: inset 0 1px 0 var(--color-app-line);
+  --shadow-app-line-bottom: inset 0 -1px 0 var(--color-app-line);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.land-root) {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Viền focus theo màu app; trên nền tím dùng viền trắng. */
+.land-root :focus-visible {
+  outline-color: var(--color-app-primary);
+}
+.land-root .land-on-primary :focus-visible {
+  outline-color: #ffffff;
+}
+/* ==================== hết khối LANDING ==================== */
+
+/* ======================================================================
+ * WEB QUẢN LÝ (cổng doanh nghiệp, quản trị) — bổ sung cho src/components/web.
+ * Chỉ THÊM token, không sửa token ở trên. Giá trị lấy từ Web*.dc.html; vài màu
+ * chữ được làm đậm nhẹ để đạt tương phản 4.5:1 (ghi chú cạnh từng token).
+ * ==================================================================== */
+@theme {
+  /* Chữ phụ trên nền xám (#73726E chỉ đạt 4.3:1 trên #F1F1EF) */
+  --color-muted: #6f6e6a;
+  /* Thanh bên: chữ, icon, nền mục đang mở, viền phải */
+  --color-nav-ink: #5f5e5b;
+  --color-nav-icon: #91918e;
+  --color-nav-active: #ebeae7;
+  /* Đường chia trong danh sách, dưới tiêu đề mục; viền ô tìm; dấu / ở đường dẫn */
+  --color-line-soft: #ededec;
+  --color-line-strong: #dfdfdc;
+  --color-faint: #c1c0bc;
+  /* Nền nút chính: #2383E2 chỉ đạt 3.9:1 với chữ trắng, dùng sắc đậm hơn một chút */
+  --color-blue-action: #1c78d2;
+  /* Cột biểu đồ thường */
+  --color-blue-bar: #bfd9f2;
+  /* Màu ý nghĩa: tốt, xấu (đậm nhẹ từ #D44C47), cảnh báo, thông tin, cam, xám thanh đo */
+  --color-good: #448361;
+  --color-good-ink: #2b6b3f;
+  --color-bad: #d2443f;
+  --color-warn: #cb912f;
+  --color-info: #337ea9;
+  --color-accent-orange: #d9730d;
+  --color-meter-grey: #9b9a97;
+  /* Chữ nút nguy hiểm, dòng lỗi ô nhập; nền số chờ xử lý (đậm nhẹ từ #E03E3E) */
+  --color-danger: #d4302b;
+  --color-badge: #de3333;
+  /* Mã trong bảng (đậm từ #EB5757 để đạt 4.5:1 trên nền mã) */
+  --color-code: #c42b2b;
+  --color-code-bg: rgba(135, 131, 120, 0.15);
+  /* Công tắc tắt, lớp phủ sau khung trượt */
+  --color-toggle-off: rgba(135, 131, 120, 0.35);
+  --color-overlay: rgba(15, 15, 15, 0.25);
+  /* Nền khối ghi chú */
+  --color-callout-amber: #fbf3db;
+  --color-callout-green: #edf3ec;
+  --color-callout-red: #fdebec;
+  /* Chấm trong nhãn trạng thái */
+  --color-dot-green: #6c9b7d;
+  --color-dot-amber: #cb912f;
+  --color-dot-grey: #a3a29e;
+  --color-dot-red: #e16f64;
+  --color-dot-blue: #5b97bd;
+  --color-dot-orange: #d9730d;
+
+  --radius-seg: 5px;
+  --radius-mark: 7px;
+  --radius-tile: 8px;
+
+  /* Viền vẽ bằng bóng trong (không đổi kích thước phần tử) */
+  --shadow-frame: inset 0 0 0 1px var(--color-line);
+  --shadow-line-b: inset 0 -1px 0 var(--color-line);
+  --shadow-line-t: inset 0 1px 0 var(--color-line);
+  --shadow-soft-b: inset 0 -1px 0 var(--color-line-soft);
+  --shadow-sidebar: inset -1px 0 0 var(--color-line-soft);
+  /* Ô nhập: thường, đang nhập, lỗi */
+  --shadow-field: inset 0 0 0 1px rgba(15, 15, 15, 0.1);
+  --shadow-field-focus: inset 0 0 0 1px rgba(35, 131, 226, 0.57), 0 0 0 2px rgba(35, 131, 226, 0.35);
+  --shadow-field-error: inset 0 0 0 1px rgba(224, 62, 62, 0.7);
+  /* Nút */
+  --shadow-btn-primary: inset 0 0 0 1px rgba(15, 15, 15, 0.1), 0 1px 2px rgba(15, 15, 15, 0.1);
+  --shadow-btn-secondary: inset 0 0 0 1px rgba(15, 15, 15, 0.15), 0 1px 2px rgba(15, 15, 15, 0.06);
+  --shadow-btn-danger: inset 0 0 0 1px rgba(224, 62, 62, 0.45), 0 1px 2px rgba(15, 15, 15, 0.06);
+  --shadow-outline: inset 0 0 0 1px rgba(15, 15, 15, 0.15);
+  /* Phân đoạn đang chọn, núm công tắc, lựa chọn đang chọn, mục đang chọn trong hàng chờ */
+  --shadow-seg-on: 0 0 0 1px rgba(15, 15, 15, 0.08), 0 1px 2px rgba(15, 15, 15, 0.1);
+  --shadow-knob: 0 1px 2px rgba(15, 15, 15, 0.25);
+  --shadow-choice-on: inset 0 0 0 2px var(--color-blue);
+  --shadow-select: inset 2px 0 0 var(--color-blue);
+  /* Khung trượt bên phải */
+  --shadow-drawer: -12px 0 32px -12px rgba(15, 15, 15, 0.18);
+}
+
+/* Chữ mờ trong ô nhập của web quản lý */
+.web-field::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+/* ==================== hết khối WEB QUẢN LÝ ==================== */
