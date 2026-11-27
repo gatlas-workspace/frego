@@ -1,0 +1,6 @@
+// TODO(màn hình): dựng theo thiết kế TaiKhoan-v2.dc.html
+import { Placeholder } from '@/components/Placeholder';
+
+export default function Screen() {
+  return <Placeholder title="9 · Tài khoản" />;
+}

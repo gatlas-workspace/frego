@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Frego",
+    "slug": "frego",
+    "scheme": "frego",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F4F5FA",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "vn.frego.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["grab", "be", "xanhsm"],
+        "NSLocationWhenInUseUsageDescription": "Frego dùng vị trí khi đang mở app để điền điểm đón và tính quãng đường.",
+        "NSPhotoLibraryUsageDescription": "Chọn ảnh đại diện cho tài khoản Frego.",
+        "NSCameraUsageDescription": "Chụp ảnh đại diện cho tài khoản Frego."
+      }
+    },
+    "android": {
+      "package": "vn.frego.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#3D3BD4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-font",
+      ["expo-splash-screen", { "backgroundColor": "#F4F5FA", "image": "./assets/splash-icon.png", "imageWidth": 120 }],
+      "expo-web-browser",
+      ["expo-image-picker", { "photosPermission": "Chọn ảnh đại diện cho tài khoản Frego.", "cameraPermission": "Chụp ảnh đại diện cho tài khoản Frego." }]
+    ],
+    "experiments": { "typedRoutes": false }
+  }
+}

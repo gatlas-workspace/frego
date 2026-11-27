@@ -1,0 +1,223 @@
+/**
+ * Kết nối dữ liệu cho app:
+ * - Có EXPO_PUBLIC_SUPABASE_URL + EXPO_PUBLIC_SUPABASE_ANON_KEY → Supabase thật (đăng nhập OTP qua SMS).
+ * - Không có → chế độ DEMO: dữ liệu mẫu trong bộ nhớ, lưu lại trên máy bằng AsyncStorage, mã OTP bất kỳ 6 số.
+ *
+ * Màn hình dùng: const { svc } = useApi(); useQuery({ queryKey: ['home'], queryFn: svc.getHome })
+ */
+import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createClient } from '@supabase/supabase-js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createMemoryDb,
+  createSeed,
+  createUserService,
+  DEMO_USER_ID,
+  maskPhone,
+  toE164Vn,
+  type Db,
+  type Seed,
+  type UserService,
+} from '@frego/core';
+import { createSupabaseDb } from '@frego/core/supabase';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+export const MODE: 'demo' | 'supabase' = SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'demo';
+
+const DEMO_DATA_KEY = 'frego.demo.data.v1';
+const DEMO_SESSION_KEY = 'frego.demo.session.v1';
+
+type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+
+export interface ApiContextValue {
+  mode: typeof MODE;
+  db: Db;
+  svc: UserService;
+  status: AuthStatus;
+  /** Đang xem với tư cách khách (chưa đăng nhập bằng số điện thoại). */
+  guest: boolean;
+  /** Số điện thoại đang chờ OTP, đã che: "0909 ••• 123" */
+  pendingPhone: string | null;
+  sendOtp(phone: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  verifyOtp(code: string): Promise<{ ok: true; welcome: boolean } | { ok: false; error: string }>;
+  /** "Xem voucher trước, đăng nhập sau" */
+  continueAsGuest(): Promise<void>;
+  signOut(): Promise<void>;
+  /** DEMO: đưa dữ liệu mẫu về như ban đầu. */
+  resetDemo(): Promise<void>;
+}
+
+const ApiContext = createContext<ApiContextValue | null>(null);
+
+export const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 5_000, retry: 1 } },
+});
+
+function useDemoBackend() {
+  const [db] = useState(() =>
+    createMemoryDb(createSeed(), {
+      onChange: (data: Seed) => {
+        AsyncStorage.setItem(DEMO_DATA_KEY, JSON.stringify(data)).catch(() => {});
+      },
+    }),
+  );
+  return db;
+}
+
+export function ApiProvider({ children }: { children: ReactNode }) {
+  const demoDb = useDemoBackend();
+  const supa = useMemo(() => {
+    if (MODE !== 'supabase') return null;
+    const client = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
+    });
+    return createSupabaseDb(client);
+  }, []);
+  const db: Db = supa ?? demoDb;
+  const svc = useMemo(() => createUserService(db), [db]);
+
+  const [status, setStatus] = useState<AuthStatus>('loading');
+  const [guest, setGuest] = useState(false);
+  const [phone, setPhone] = useState<string | null>(null);
+
+  // Khởi động: khôi phục phiên.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (supa) {
+        const id = await supa.refreshUser();
+        const { data } = await supa.client.auth.getSession();
+        if (!alive) return;
+        setGuest(!!data.session?.user?.is_anonymous);
+        setStatus(id ? 'signedIn' : 'signedOut');
+        supa.client.auth.onAuthStateChange(async () => {
+          const uid = await supa.refreshUser();
+          setStatus(uid ? 'signedIn' : 'signedOut');
+          queryClient.invalidateQueries();
+        });
+        return;
+      }
+      try {
+        const [saved, session] = await Promise.all([
+          AsyncStorage.getItem(DEMO_DATA_KEY),
+          AsyncStorage.getItem(DEMO_SESSION_KEY),
+        ]);
+        if (saved) Object.assign(demoDb.data, JSON.parse(saved));
+        if (session) {
+          const s = JSON.parse(session) as { userId: string; guest: boolean };
+          demoDb.setUser(s.userId);
+          setGuest(s.guest);
+          if (alive) setStatus('signedIn');
+          return;
+        }
+      } catch {
+        /* bỏ qua dữ liệu hỏng */
+      }
+      if (alive) setStatus('signedOut');
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [supa, demoDb]);
+
+  const sendOtp = useCallback<ApiContextValue['sendOtp']>(
+    async (input) => {
+      const e164 = toE164Vn(input);
+      if (!e164) return { ok: false, error: 'Số điện thoại chưa đúng. Ví dụ: 909 123 456' };
+      if (supa) {
+        const { error } = await supa.client.auth.signInWithOtp({ phone: e164 });
+        if (error) return { ok: false, error: 'Chưa gửi được mã. Thử lại sau ít phút.' };
+      }
+      setPhone(e164);
+      return { ok: true };
+    },
+    [supa],
+  );
+
+  const verifyOtp = useCallback<ApiContextValue['verifyOtp']>(
+    async (code) => {
+      if (!/^\d{6}$/.test(code)) return { ok: false, error: 'Mã gồm 6 số.' };
+      if (supa) {
+        if (!phone) return { ok: false, error: 'Nhập số điện thoại trước.' };
+        const { error } = await supa.client.auth.verifyOtp({ phone, token: code, type: 'sms' });
+        if (error) return { ok: false, error: 'Mã chưa đúng hoặc đã hết hạn.' };
+        await supa.refreshUser();
+      } else {
+        // DEMO: đăng nhập vào tài khoản mẫu Minh Anh để xem đủ dữ liệu.
+        demoDb.setUser(DEMO_USER_ID);
+        await AsyncStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({ userId: DEMO_USER_ID, guest: false }));
+      }
+      const welcome = await svc.ensureWelcomeVoucher().catch(() => null);
+      setGuest(false);
+      setStatus('signedIn');
+      queryClient.invalidateQueries();
+      return { ok: true, welcome: !!welcome };
+    },
+    [supa, demoDb, phone, svc],
+  );
+
+  const continueAsGuest = useCallback(async () => {
+    if (supa) {
+      await supa.client.auth.signInAnonymously();
+      await supa.refreshUser();
+    } else {
+      demoDb.setUser(DEMO_USER_ID);
+      await AsyncStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({ userId: DEMO_USER_ID, guest: true }));
+    }
+    setGuest(true);
+    setStatus('signedIn');
+    queryClient.invalidateQueries();
+  }, [supa, demoDb]);
+
+  const signOut = useCallback(async () => {
+    if (supa) await supa.client.auth.signOut();
+    else {
+      demoDb.setUser(null);
+      await AsyncStorage.removeItem(DEMO_SESSION_KEY);
+    }
+    setGuest(false);
+    setPhone(null);
+    setStatus('signedOut');
+    queryClient.clear();
+  }, [supa, demoDb]);
+
+  const resetDemo = useCallback(async () => {
+    if (supa) return;
+    const fresh = createSeed();
+    for (const k of Object.keys(fresh) as (keyof Seed)[]) (demoDb.data as Record<string, unknown>)[k] = fresh[k];
+    await AsyncStorage.setItem(DEMO_DATA_KEY, JSON.stringify(demoDb.data));
+    queryClient.invalidateQueries();
+  }, [supa, demoDb]);
+
+  const value: ApiContextValue = {
+    mode: MODE,
+    db,
+    svc,
+    status,
+    guest,
+    pendingPhone: phone ? maskPhone(phone) : null,
+    sendOtp,
+    verifyOtp,
+    continueAsGuest,
+    signOut,
+    resetDemo,
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ApiContext.Provider value={value}>{children}</ApiContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
+export function useApi(): ApiContextValue {
+  const ctx = useContext(ApiContext);
+  if (!ctx) throw new Error('useApi phải nằm trong <ApiProvider>');
+  return ctx;
+}
+
+/** Làm mới mọi dữ liệu sau khi ghi. */
+export const refreshAll = () => queryClient.invalidateQueries();
