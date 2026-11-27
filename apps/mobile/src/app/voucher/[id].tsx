@@ -17,6 +17,7 @@ const backToWallet = () => router.dismissTo('/vi');
 
 /** Nơi người nhận hay đến (vẽ trên bản đồ): lấy từ ghi chú "…hay đến khu X" hoặc địa chỉ "…gần X". */
 function placeFrom(d: VoucherDetailView): string | null {
+  if (d.landmark) return d.landmark;
   const fromNote = /khu\s+(.+?)\.?$/i.exec(d.voucher.note)?.[1];
   if (fromNote) return fromNote.trim();
   const fromAddress = /gần\s+([^,]+)/i.exec(d.businessAddress)?.[1];

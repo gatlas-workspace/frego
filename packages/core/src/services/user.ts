@@ -240,6 +240,8 @@ export interface VoucherDetailView {
   voucher: UserVoucher;
   businessName: string;
   businessAddress: string;
+  /** Địa danh gần quán ("Chợ Bến Thành") để vẽ trên bản đồ vùng áp dụng */
+  landmark: string | null;
   category: CategoryKey | 'frego';
   amountText: string;
   serviceText: string;
@@ -977,6 +979,7 @@ export function createUserService(db: Db) {
         voucher: v,
         businessName: b?.name ?? brand.name,
         businessAddress: b?.address.split(',').slice(0, 2).join(',') ?? '',
+        landmark: b?.landmark || null,
         category: b?.category ?? 'frego',
         amountText: formatDiscount(v.amount),
         serviceText: `${PROVIDERS[v.providerId].name} ${SERVICES[`${v.providerId}-${v.vehicleClass}`].name.toLowerCase()}`,

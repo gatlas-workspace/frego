@@ -62,6 +62,10 @@ export function Pill({ label, state = 'default', icon, onPress, accessibilityRol
           accessibilityRole={accessibilityRole ?? 'button'}
           accessibilityLabel={accessibilityLabel ?? label}
           accessibilityState={{ selected, disabled: !!disabled }}
+          // Web: react-native-web chuyển thẳng thuộc tính ARIA ra DOM (accessibilityState không sinh aria-pressed).
+          {...((accessibilityRole ?? 'button') === 'button'
+            ? ({ 'aria-pressed': selected } as object)
+            : { 'aria-checked': selected })}
           style={({ pressed }) => [base, box, { opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }]}
         >
           {content}

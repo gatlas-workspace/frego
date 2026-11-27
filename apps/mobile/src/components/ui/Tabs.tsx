@@ -42,6 +42,7 @@ export function Tabs<K extends string = string>({ items, value, onChange, access
             accessibilityRole="tab"
             accessibilityLabel={text}
             accessibilityState={{ selected: on }}
+            aria-selected={on}
             style={({ pressed }) => [
               {
                 flex: 1,

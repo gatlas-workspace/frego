@@ -52,6 +52,7 @@ export function NavBar({ active, badge, onNavigate }: { active: NavKey; badge?: 
             onPress={() => onNavigate(it.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            aria-selected={on}
             accessibilityLabel={showBadge ? `${it.label}, ${badge} chưa đọc` : it.label}
             style={({ pressed }) => ({
               flex: 1,
