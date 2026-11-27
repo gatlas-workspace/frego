@@ -126,7 +126,8 @@ export const Field = forwardRef<TextInputInstance, FieldProps>(function Field(
               fontSize: 16,
               color: colors.ink,
               outlineWidth: 0,
-              outlineStyle: 'none',
+              // Web: bỏ viền focus mặc định của trình duyệt (khung ô nhập đã có trạng thái focus riêng).
+              ...({ outlineStyle: 'none' } as object),
             }}
           />
           {suffix ? (
