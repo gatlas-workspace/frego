@@ -2,6 +2,7 @@ import { Pressable, View, type GestureResponderEvent, type StyleProp, type ViewS
 import type { IconName } from '@frego/core';
 import { Icon } from './Icon';
 import { T } from './Text';
+import { pressScale } from '@/components/motion';
 import { colors, radius, shadow } from '@/theme/tokens';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'text' | 'dashed' | 'white';
@@ -133,6 +134,7 @@ export function Button({
             opacity: disabled ? 0.5 : 1,
           },
           l.box,
+          pressScale(pressed && !disabled),
           block ? style : null,
         ];
       }}

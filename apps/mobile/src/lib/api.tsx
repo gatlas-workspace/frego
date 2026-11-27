@@ -51,7 +51,8 @@ const geocoder = GOONG_KEY
     ? null
     : createPhotonGeocoder({ baseUrl: GEOCODING_URL });
 
-const DEMO_DATA_KEY = 'frego.demo.data.v1';
+/** Bản 3.0 đổi khóa: dữ liệu demo cũ thiếu mã giới thiệu, ảnh bìa, ảnh tại quán → nạp lại dữ liệu mẫu mới. */
+const DEMO_DATA_KEY = 'frego.demo.data.v3';
 const DEMO_SESSION_KEY = 'frego.demo.session.v1';
 /** DEMO: tài khoản khách ("Xem voucher trước, đăng nhập sau"). */
 const DEMO_GUEST_ID = '00000000-0000-4000-8000-00000000ff01';

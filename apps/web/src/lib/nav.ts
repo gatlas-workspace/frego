@@ -12,7 +12,9 @@ export type AdminNavKey =
   | 'khoma'
   | 'banggia'
   | 'doitac'
-  | 'hotro';
+  | 'hotro'
+  | 'anhbia'
+  | 'anhtaiquan';
 
 export const BIZ_NAV: { group: string; items: { key: BizNavKey; label: string; href: string; icon: string }[] }[] = [
   {
@@ -40,6 +42,8 @@ export const ADMIN_NAV: { group: string; items: { key: AdminNavKey; label: strin
       { key: 'nguoidung', label: 'Người dùng, báo giá', href: '/quan-tri/nguoi-dung', icon: 'user' },
       { key: 'diem', label: 'Điểm và mã Frego', href: '/quan-tri/diem', icon: 'sparkplus' },
       { key: 'thongbao', label: 'Thông báo', href: '/quan-tri/thong-bao', icon: 'bell' },
+      { key: 'anhtaiquan', label: 'Ảnh tại quán', href: '/quan-tri/anh-tai-quan', icon: 'camera' },
+      { key: 'anhbia', label: 'Ảnh bìa app', href: '/quan-tri/anh-bia', icon: 'camera' },
     ],
   },
   {

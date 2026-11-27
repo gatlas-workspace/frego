@@ -5,12 +5,12 @@ Mọi thứ chạy ở chế độ **DEMO** (dữ liệu mẫu trong bộ nhớ,
 ## 0. Review không cần cài gì (Expo, tài khoản gatlas.workspace)
 
 - **Dự án trên Expo**: https://expo.dev/accounts/gatlas.workspace/projects/frego
-- **App bản web** (Expo Hosting, mở trên điện thoại hoặc máy tính): https://frego--mz7ktmmhb9.expo.app — trên máy tính bật chế độ điện thoại (F12) cho đúng khung 390 px.
+- **App bản web** (Expo Hosting, mở trên điện thoại hoặc máy tính): https://frego--xcz80bkjtb.expo.app (bản 27/11/2026) — trên máy tính bật chế độ điện thoại (F12) cho đúng khung 390 px.
 - **App Android cài thử (APK)**: expo.dev → dự án frego → Builds → bản "preview" mới nhất → Install (quét mã QR bằng điện thoại Android, cho phép cài từ nguồn ngoài).
 - **Expo Go (iPhone và Android)**: mở Expo Go (đăng nhập gatlas.workspace) → Projects → frego → nhánh **preview** → chọn bản mới nhất. Hoặc mở link `exp://u.expo.dev/6fc10379-54e7-47b4-a681-27e55ebacfac?channel-name=preview` trên điện thoại.
 - Bản cài riêng trên iPhone (không qua Expo Go) cần tài khoản Apple Developer (TestFlight) — chưa làm.
 
-Đẩy bản mới lên Expo (cần `EXPO_TOKEN` của tài khoản gatlas.workspace, tạo ở expo.dev → Access tokens):
+Đẩy bản mới lên Expo (đăng nhập `npx eas-cli@latest login` hoặc `EXPO_TOKEN` của tài khoản gatlas.workspace; thư mục làm việc không phải git repo thì thêm `EAS_NO_VCS=1` trước lệnh eas):
 
 ```bash
 cd apps/mobile && npx expo export --platform web && npx eas-cli@latest deploy

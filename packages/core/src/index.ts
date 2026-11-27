@@ -9,13 +9,28 @@ export * from './routing';
 export * from './geocoding';
 export * from './icons';
 export * from './receipts';
-export type { Db, FileStore, ListOptions, Rpcs, RpcName, RecordTripArgs, RecordReceiptArgs, RecordReceiptResult } from './db/types';
+export type {
+  Db,
+  FileStore,
+  ListOptions,
+  Rpcs,
+  RpcName,
+  RecordTripArgs,
+  RecordReceiptArgs,
+  RecordReceiptResult,
+  ReferralCheckReason,
+  ReferralCheckResult,
+  MyReferralFriend,
+  MyReferralsResult,
+} from './db/types';
 export type { Tables, TableName, Row, Seed, StatRow } from './db/schema';
 export { PRIMARY_KEYS } from './db/schema';
 export {
   createMemoryDb,
   uid,
   genCode,
+  genReferralCode,
+  normalizeReferralCode,
   stripDiacritics,
   RECEIPT_MATCH_WINDOW_MS,
   RECEIPT_CLOCK_SKEW_MS,
@@ -27,3 +42,4 @@ export * from './services/user';
 export * from './services/business';
 export * from './services/admin';
 export * from './services/admin-ops';
+export { sha256Hex, sha256HexSync } from './sha256';

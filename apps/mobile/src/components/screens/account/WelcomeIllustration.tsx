@@ -1,15 +1,16 @@
 import { View, type ViewStyle } from 'react-native';
 import { brand, formatDiscountShort, formatVnd } from '@frego/core';
 import { DashLine, T } from '@/components/ui';
+import { Float } from '@/components/motion';
 import { colors, radius, shadow } from '@/theme/tokens';
 
 /** Vé minh họa nghiêng: số giảm trên nền cam, răng cưa, tên dịch vụ + nguồn mã. */
-function IlloTicket({ amount, title, sub, style }: { amount: string; title: string; sub: string; style: ViewStyle }) {
+function IlloTicket({ amount, title, sub, style, at, index }: { amount: string; title: string; sub: string; style: ViewStyle; at: ViewStyle; index: number }) {
   return (
+    <Float index={index} style={[{ position: 'absolute' }, at]}>
     <View
       style={[
         {
-          position: 'absolute',
           width: 228,
           flexDirection: 'row',
           alignItems: 'center',
@@ -38,6 +39,7 @@ function IlloTicket({ amount, title, sub, style }: { amount: string; title: stri
         </T>
       </View>
     </View>
+    </Float>
   );
 }
 
@@ -63,19 +65,25 @@ export function WelcomeIllustration() {
         amount={formatDiscountShort(20000)}
         title="Grab ô tô"
         sub="Quán tặng riêng"
-        style={{ left: 16, top: 18, transform: [{ rotate: '-3deg' }] }}
+        index={0}
+        at={{ left: 16, top: 18 }}
+        style={{ transform: [{ rotate: '-3deg' }] }}
       />
       <IlloTicket
         amount={formatDiscountShort(brand.welcomeAmount)}
         title="Be xe máy"
         sub={`Mã ${brand.welcomeCode}`}
-        style={{ left: 40, top: 80, transform: [{ rotate: '2deg' }] }}
+        index={1}
+        at={{ left: 40, top: 80 }}
+        style={{ transform: [{ rotate: '2deg' }] }}
       />
       <IlloTicket
         amount={formatDiscountShort(0, 0.25)}
         title="Green SM"
-        sub="Tự áp, không cần mã"
-        style={{ left: 14, top: 142, transform: [{ rotate: '-2deg' }] }}
+        sub="Tự giảm sẵn"
+        index={2}
+        at={{ left: 14, top: 142 }}
+        style={{ transform: [{ rotate: '-2deg' }] }}
       />
       <View
         style={{

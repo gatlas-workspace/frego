@@ -1,4 +1,4 @@
-// Màn 4 · Báo giá thật (thiết kế BaoGia-v2.dc.html). Mở từ thông báo "mã vừa được dùng" (3b).
+// Màn 2f · Báo giá thật (thiết kế UI v3: V3-BaoGia.dc.html). Mở từ thông báo "mã vừa được dùng" (3b).
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
@@ -7,6 +7,7 @@ import { formatVnd, parseVnd, POINTS_RULES, type PriceVerdict } from '@frego/cor
 import { BackButton, Button, Chip, Field, InfoNote, ListRow, ModalSheet, T, VehicleTile } from '@/components/ui';
 import { noBreak } from '@/components/screens/flow/noBreak';
 import { ErrorState, LoadingBlocks } from '@/components/screens/flow/ScreenState';
+import { ShopPhotoCard } from '@/components/screens/flow/ShopPhotoCard';
 import { SkeletonBackdrop } from '@/components/screens/flow/SkeletonBackdrop';
 import { VerdictTiles } from '@/components/screens/flow/VerdictTiles';
 import { refreshAll, useApi } from '@/lib/api';
@@ -172,6 +173,8 @@ export default function ReportPriceScreen() {
             ) : null}
           </View>
         )}
+
+        <ShopPhotoCard tripId={String(tripId)} />
 
         {gmailSoon ? (
           <ListRow

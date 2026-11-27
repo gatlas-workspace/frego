@@ -57,6 +57,8 @@ export const brand = {
     primarySoft: '#ECEBFF',
     deal: '#FFF0E5',
     dealInk: '#9A3412',
+    /** Lớp phủ tối trên ảnh bìa Trang chủ (QT 13) để chữ trắng dễ đọc. */
+    coverOverlay: '#14152B',
   },
 } as const;
 

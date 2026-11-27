@@ -91,27 +91,51 @@ export function StatCards({
 }
 
 /** Khách chưa đăng nhập: mời đăng nhập bằng số điện thoại thay cho hồ sơ. */
+/** Tài khoản khi chưa đăng nhập (UI v3: V3-TaiKhoanKhach.dc.html): thẻ tím nêu lợi ích + nút đăng nhập. */
 export function GuestPrompt({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <Card gap={14}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Icon name="user" size={26} color={colors.primary} strokeWidth={1.9} />
+    <Card tone="primary" padding={18} gap={12}>
+      <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: colors.primaryDeep }}>
+        <T weight={700} size={12} lineHeight={16} color={colors.white}>
+          Đang xem với tư cách khách
+        </T>
+      </View>
+      <T weight={800} size={21} lineHeight={27} color={colors.white} accessibilityRole="header" style={{ letterSpacing: -0.3 }}>
+        Đăng nhập để giữ mã và tích điểm
+      </T>
+      <View style={{ gap: 8 }}>
+        {['Quà chào mừng của Frego cho chuyến đầu', 'Mã riêng của quán gần nơi bạn hay đến', 'Báo giá thật để nhận điểm đổi voucher'].map((t) => (
+          <View key={t} style={{ flexDirection: 'row', gap: 8 }}>
+            <Icon name="check" size={16} color={colors.vehicleHeadlight} strokeWidth={2.8} />
+            <T size={14} lineHeight={20} color={colors.primarySoft2} style={{ flex: 1 }}>
+              {t}
+            </T>
+          </View>
+        ))}
+      </View>
+      <Button label="Đăng nhập bằng số điện thoại" variant="white" onPress={onSignIn} />
+    </Card>
+  );
+}
+
+/** Thẻ cam "Giới thiệu bạn bè" ở Tài khoản (UI v3). */
+export function ReferralCard({ referrer, referee, onPress }: { referrer: number; referee: number; onPress: () => void }) {
+  return (
+    <Card onPress={onPress} padding={14} accessibilityLabel={`Giới thiệu bạn bè. Bạn cộng ${referrer} điểm, bạn bè cộng ${referee} điểm`} style={{ backgroundColor: colors.deal, borderColor: colors.deal }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="gift" size={20} color={colors.dealInk} strokeWidth={2} />
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <T weight={800} size={18} lineHeight={23} accessibilityRole="header">
-            Bạn đang xem với tư cách khách
+          <T weight={800} size={15} lineHeight={20}>
+            Giới thiệu bạn bè
           </T>
-          <T size={14} lineHeight={20} color={colors.ink2}>
-            Đăng nhập bằng số điện thoại để giữ mã voucher riêng và cộng điểm mỗi lần báo giá.
+          <T size={13} lineHeight={18} color={colors.ink2}>
+            Bạn +{referrer} điểm, bạn bè +{referee} điểm
           </T>
         </View>
+        <Icon name="chev" size={18} color={colors.dealInk} strokeWidth={2} />
       </View>
-      <Button label="Đăng nhập bằng số điện thoại" size="md" onPress={onSignIn} />
     </Card>
   );
 }

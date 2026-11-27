@@ -1,10 +1,12 @@
-// Màn 2 · Gắn voucher cho chuyến (thiết kế KetQua-v2.dc.html)
+// Màn 2a · Gắn voucher theo hãng (thiết kế UI v3: V3-GanVoucher.dc.html)
 import { useMutation } from '@tanstack/react-query';
 import { Redirect, router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
-import { OFFER_PRIORITIES, toggleSelection } from '@frego/core';
-import { BottomBar, Button, Card, Field, InfoNote, ListCard, Pill, SectionTitle, Sheet, T, Tabs, VoucherTicket } from '@/components/ui';
+import { OFFER_PRIORITIES, toggleSelection, type AttachItemView, type ServiceKey } from '@frego/core';
+import { BottomBar, Button, Card, Field, InfoNote, ListCard, Pill, SectionTitle, Sheet, T, Tabs } from '@/components/ui';
+import { Rise } from '@/components/motion';
+import { CodeGroup } from '@/components/screens/flow/CodeGroup';
 import { MapHeader } from '@/components/screens/flow/MapHeader';
 import { useApi } from '@/lib/api';
 import { useTripFlow } from '@/lib/trip-flow';
@@ -22,6 +24,19 @@ export default function AttachScreen() {
   const [mapOpen, setMapOpen] = useState(false);
 
   const items = useMemo(() => (plan ? svc.attachItems(plan, selection, priority) : []), [svc, plan, selection, priority]);
+  // Gom theo hãng + loại xe, giữ thứ tự ưu tiên của mục đầu mỗi nhóm.
+  const groups = useMemo(() => {
+    const m = new Map<ServiceKey, AttachItemView[]>();
+    for (const it of items) m.set(it.service, [...(m.get(it.service) ?? []), it]);
+    return [...m.entries()];
+  }, [items]);
+  const onToggle = useCallback(
+    (it: AttachItemView) => {
+      const offer = plan?.evaluation.eligible.find((e) => e.offer.refId === it.refId && e.service === it.service);
+      if (offer) setSelection(toggleSelection(selection, offer));
+    },
+    [plan, selection, setSelection],
+  );
 
   const addCode = useMutation({
     mutationFn: (input: string) => svc.addCustomCode(plan!, input),
@@ -56,7 +71,7 @@ export default function AttachScreen() {
       />
       <Sheet
         title={plan.title}
-        subtitle={plan.subtitle}
+        subtitle={`${plan.subtitle} · voucher không đổi điểm đến`}
         collapsed={mapOpen}
         onCollapsedChange={setMapOpen}
         footer={
@@ -65,8 +80,6 @@ export default function AttachScreen() {
           </BottomBar>
         }
       >
-        <InfoNote icon="pinok" title={`Điểm đến vẫn là ${plan.dest.name}`} text="Voucher chỉ giảm giá, không đổi địa chỉ đến." />
-
         <View style={{ gap: 10 }}>
           <SectionTitle text="Gắn voucher trước khi so giá" />
           {/* Cách ưu tiên: quyết định mã được tự gắn cho từng hãng và thứ tự danh sách (chốt 27/11/2026). */}
@@ -81,26 +94,13 @@ export default function AttachScreen() {
           </T>
         </View>
 
-        {items.length > 0 ? (
-          <View accessibilityRole="list" accessibilityLabel="Voucher dùng được cho chuyến này" style={{ gap: 12 }}>
-            {items.map((it) => {
-              const offer = plan.evaluation.eligible.find((e) => e.offer.refId === it.refId && e.service === it.service);
-              return (
-                <VoucherTicket
-                  key={`${it.refId}:${it.service}`}
-                  mode="attach"
-                  logo={it.logo}
-                  amountText={it.amountText}
-                  serviceText={it.serviceText}
-                  tag={it.tag}
-                  name={it.name}
-                  conditionLine={it.conditionLine}
-                  metaText={it.metaText}
-                  attached={it.attached}
-                  onToggle={() => offer && setSelection(toggleSelection(selection, offer))}
-                />
-              );
-            })}
+        {groups.length > 0 ? (
+          <View accessibilityRole="list" accessibilityLabel="Voucher dùng được cho chuyến này" style={{ gap: 20 }}>
+            {groups.map(([service, list], i) => (
+              <Rise key={service} index={i}>
+                <CodeGroup service={service} items={list} onToggle={onToggle} />
+              </Rise>
+            ))}
           </View>
         ) : (
           <InfoNote tone="neutral" icon="ticket" text="Chưa có voucher hợp chuyến này. Bạn vẫn so giá được, hoặc nhập mã riêng bên dưới." />

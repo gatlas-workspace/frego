@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import type { RewardView } from '@frego/core';
+import { POINTS_RULES, type RewardView } from '@frego/core';
 import { Button, InfoNote, ListCard, ListRow, ModalSheet, ScreenHeader, SectionTitle, T } from '@/components/ui';
 import { PointsHero } from '@/components/screens/wallet/PointsHero';
 import { ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
@@ -84,6 +84,15 @@ export default function PointsScreen() {
               {EARN.map((e) => (
                 <ListRow key={e.key} lead="none" title={e.title} sub={e.sub} subWrap chip={e.chip} chipTone="tint" />
               ))}
+              <ListRow
+                lead="none"
+                title="Giới thiệu bạn bè"
+                sub="Khi bạn bè báo giá thật chuyến đầu tiên"
+                subWrap
+                chip={`+${POINTS_RULES.referral.referrer}`}
+                chipTone="tint"
+                onPress={() => router.push('/gioi-thieu')}
+              />
             </ListCard>
           </View>
 

@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { Platform, Pressable, TextInput, View, type TextInputInstance } from 'react-native';
 import { T } from '@/components/ui';
+import { Blink } from '@/components/motion';
 import { colors, fontFamily } from '@/theme/tokens';
 
 export interface OtpInputProps {
@@ -58,7 +59,7 @@ export const OtpInput = forwardRef<TextInputInstance | null, OtpInputProps>(func
               }}
             >
               {showCaret && !digit ? (
-                <View style={{ width: 2, height: 26, borderRadius: 1, backgroundColor: colors.primary }} />
+                <Blink style={{ width: 2, height: 26, borderRadius: 1, backgroundColor: colors.primary }} />
               ) : (
                 <T weight={800} size={24} lineHeight={30} style={{ fontVariant: ['tabular-nums'] }}>
                   {digit}

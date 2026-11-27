@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { pressScale } from '@/components/motion';
 import { colors, radius, shadow } from '@/theme/tokens';
 
 export interface CardProps {
@@ -19,7 +20,7 @@ export interface CardProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Thẻ trắng bo 24 có bóng thẻ — khối nội dung cơ bản của mọi màn. */
+/** Thẻ trắng bo 16, viền mảnh (UI v3) — khối nội dung cơ bản của mọi màn. */
 export function Card({
   children,
   padding = 16,
@@ -36,6 +37,7 @@ export function Card({
     borderRadius: radius.card,
     backgroundColor: bg,
     boxShadow: tone === 'surface' ? shadow.card : undefined,
+    ...(tone === 'surface' ? { borderWidth: 1, borderColor: colors.line } : null),
   };
   // Bóng nằm ở khung ngoài, phần cắt theo bo góc ở khung trong để không mất bóng.
   const inner = clip ? <View style={{ borderRadius: radius.card, overflow: 'hidden', padding, gap }}>{children}</View> : children;
@@ -51,6 +53,7 @@ export function Card({
           outer,
           own,
           pressed && { backgroundColor: tone === 'primary' ? colors.primaryDeep : tone === 'bg' ? colors.track : colors.surfaceAlt },
+          pressScale(pressed),
           style,
         ]}
       >

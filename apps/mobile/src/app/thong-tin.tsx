@@ -11,6 +11,7 @@ import { AvatarPicker } from '@/components/screens/account/AvatarPicker';
 import { PageHeading } from '@/components/screens/account/PageHeading';
 import { ErrorView, InlineError, LoadingView } from '@/components/screens/account/ScreenState';
 import { SheetModal } from '@/components/screens/account/SheetModal';
+import { ReferralCodeInput, useReferralCheck } from '@/components/screens/account/ReferralCodeInput';
 import { refreshAll, useApi } from '@/lib/api';
 import { colors, layout } from '@/theme/tokens';
 
@@ -65,6 +66,14 @@ function ProfileForm({ me, topPad, onDone, fromAccount }: { me: MeView; topPad: 
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState(false);
   const [sheet, setSheet] = useState(false);
+  // Mã giới thiệu: chỉ khi tạo tài khoản (không hiện khi sửa từ Tài khoản), đặt cuối form để không làm phiền.
+  const [refCode, setRefCode] = useState('');
+  const refCheck = useReferralCheck(refCode);
+  /** Áp dụng mã nếu hợp lệ; lỗi mã không chặn bước đăng ký (vẫn nhập lại được ở màn Giới thiệu trong 7 ngày). */
+  const applyReferral = async () => {
+    if (fromAccount || refCheck.state !== 'ok') return;
+    await svc.applyReferralCode(refCode).catch(() => null);
+  };
 
   const toggle = <K extends string>(list: K[], key: K) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
 
@@ -131,6 +140,7 @@ function ProfileForm({ me, topPad, onDone, fromAccount }: { me: MeView; topPad: 
         vehiclePrefs: vehicles,
         avatarUrl: avatar,
       });
+      await applyReferral();
       refreshAll();
       onDone();
     } catch {
@@ -195,11 +205,20 @@ function ProfileForm({ me, topPad, onDone, fromAccount }: { me: MeView; topPad: 
           selected={vehicles}
           onToggle={(k) => setVehicles((l) => toggle(l, k as VehicleClass))}
         />
+        {!fromAccount ? (
+          <ReferralCodeInput value={refCode} onChange={setRefCode} check={refCheck} hint="Bạn bè gửi mã cho bạn? Nhập để nhận điểm sau chuyến đầu." />
+        ) : null}
         {saveError ? <InlineError text={saveError} /> : null}
       </ScrollView>
       <BottomBar gap={4}>
         <Button label={saving ? 'Đang lưu…' : fromAccount ? 'Lưu' : 'Lưu và tiếp tục'} onPress={save} disabled={saving || picking} />
-        <Button label={fromAccount ? 'Hủy' : 'Bỏ qua, điền sau'} variant="text" size="sm" onPress={onDone} disabled={saving} />
+        <Button
+          label={fromAccount ? 'Hủy' : 'Bỏ qua, điền sau'}
+          variant="text"
+          size="sm"
+          onPress={() => (fromAccount ? onDone() : applyReferral().finally(onDone))}
+          disabled={saving}
+        />
       </BottomBar>
       <SheetModal visible={sheet} onClose={() => setSheet(false)} title="Ảnh đại diện">
         <ListCard tone="alt" divider="lead">

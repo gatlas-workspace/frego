@@ -151,6 +151,17 @@ export function initials(name: string): string {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/**
+ * Che bớt tên (giới thiệu bạn bè, hàng duyệt ảnh): "Lan Nguyễn" → "Lan N.", "Minh Anh" → "Minh A.", một chữ giữ nguyên.
+ * Khớp hàm SQL public._mask_name.
+ */
+export function maskName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'Bạn Frego';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
 /** Đọc số tiền người dùng gõ: "24.000", "24000", "24k" → 24000. */
 export function parseVnd(input: string): number | null {
   const t = input.trim().toLowerCase().replace(/\s|đ|vnd/g, '');

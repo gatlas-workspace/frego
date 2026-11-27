@@ -9,14 +9,15 @@
  * yêu cầu hỗ trợ, nhật ký) tính trực tiếp nên đổi ngay khi quản trị viên thao tác.
  */
 import { brand } from '../brand';
-import { POINTS_RULES, PROVIDERS, PROVIDER_ORDER, SERVICES, VEHICLE_ORDER, serviceFullLabel, serviceKey, serviceShortLabel } from '../catalog';
+import { HOME_COVER_RULES, POINTS_RULES, PROVIDERS, PROVIDER_ORDER, SERVICES, VEHICLE_ORDER, serviceFullLabel, serviceKey, serviceShortLabel } from '../catalog';
 import type { Db } from '../db/types';
 import type { StatRow } from '../db/schema';
-import { formatDate, formatDateTime, formatDayMonth, formatDiscount, formatKm, formatNumber, formatPercent, formatTime, formatVnd, formatVndRange, MINUS, parseVnd, vnParts } from '../format';
+import { formatDate, formatDateTime, formatDayMonth, formatDiscount, formatKm, formatNumber, formatPercent, formatTime, formatVnd, formatVndRange, maskName, maskPhone, MINUS, parseVnd, vnParts } from '../format';
 import { estimateRoute } from '../geo';
 import { estimateFare, isPeak } from '../pricing';
 import type {
   AdminRole,
+  AppBanner,
   AuditLog,
   Broadcast,
   Business,
@@ -26,7 +27,9 @@ import type {
   Partner,
   PartnerKind,
   ProviderId,
+  ReferralStatus,
   RegionId,
+  ShopPhotoStatus,
   SupportTicket,
   VehicleClass,
   WalletTransaction,
@@ -217,6 +220,92 @@ export interface PointsAdminView {
   fraudNote: string;
   rewards: RewardRowView[];
   codes: FregoCodeRowView[];
+}
+
+/* QT 8 · Giới thiệu bạn bè */
+
+export interface ReferralRowView {
+  id: string;
+  /** "Minh Anh · 0909 ••• 123" */
+  referrerText: string;
+  refereeText: string;
+  /** "Nhập mã 20/11/2026" */
+  createdText: string;
+  status: ReferralStatus;
+  label: OpsLabel;
+  note: string | null;
+}
+
+export interface ReferralAdminView {
+  stats: { rewarded: OpsStat; points: OpsStat; pending: OpsStat; held: OpsStat };
+  /** Lượt "giữ lại để kiểm tra" (Duyệt / Từ chối) */
+  held: ReferralRowView[];
+  /** 20 lượt mới nhất */
+  recent: ReferralRowView[];
+  rulesText: string;
+}
+
+/* QT 13 · Ảnh bìa app */
+
+export interface HomeCoverRowView {
+  id: string;
+  title: string;
+  imageUrl: string;
+  storagePath: string | null;
+  startsAt: string;
+  endsAt: string;
+  overlay: number;
+  status: AppBanner['status'];
+  /** "28/11 00:00 – 30/11/2026 23:59" */
+  windowText: string;
+  /** "Đức Thịnh · vận hành" */
+  editorText: string;
+  /** Đang hiện trong app lúc này */
+  live: boolean;
+  label: OpsLabel;
+}
+
+export interface HomeCoverInput {
+  id?: string;
+  title: string;
+  /** ISO hoặc "dd/mm/yyyy hh:mm" (giờ VN) */
+  startsAt: string;
+  endsAt: string;
+  overlay: number;
+  status: AppBanner['status'];
+  imageUrl?: string;
+  storagePath?: string;
+}
+
+/* Ảnh tại quán (hàng chờ duyệt) */
+
+export type ShopPhotoFilter = 'pending' | 'all';
+
+export interface ShopPhotoRowView {
+  id: string;
+  /** URL ký (1 giờ); null nếu không lấy được */
+  imageUrl: string | null;
+  shopName: string;
+  shopAddress: string;
+  /** "Minh A. · 0909 ••• 123" (che bớt) */
+  userText: string;
+  /** "Cách quán 20 m" */
+  distanceText: string;
+  /** "22/11/2026 17:58" */
+  takenText: string;
+  /** "Landmark 81 → Chợ Bến Thành · 22/11 17:40" */
+  tripText: string;
+  submittedText: string;
+  status: ShopPhotoStatus;
+  label: OpsLabel;
+  rejectReason: string | null;
+  /** "Đức Thịnh · 22/11/2026 18:30" */
+  reviewedText: string | null;
+}
+
+export interface ShopPhotoQueueView {
+  pendingCount: number;
+  rows: ShopPhotoRowView[];
 }
 
 export interface CreateFregoCodeInput {
@@ -541,6 +630,85 @@ export function shiftOutOfQuietHours(at: Date): { at: Date; shifted: boolean } {
 }
 
 /* ───────────────────────── Dịch vụ ───────────────────────── */
+
+/** "28/11/2026 00:00" (giờ VN) hoặc ISO → Date; không đọc được → null. */
+export function parseCoverDateTime(input: string): Date | null {
+  const t = String(input ?? '').trim();
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2})[:hg](\d{2}))?$/.exec(t);
+  if (m) {
+    const [day, month, year, hour, minute] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4] ?? 0), Number(m[5] ?? 0)];
+    const d = new Date(Date.UTC(year, month - 1, day, hour, minute) - VN_OFFSET_MS);
+    const p = vnParts(d);
+    if (p.day !== day || p.month !== month || hour > 23 || minute > 59) return null;
+    return d;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(t)) return null;
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Khoảng giờ hiện ảnh bìa: "28/11 00:00 – 30/11/2026 23:59" (khác năm: ghi đủ năm cả hai đầu). */
+function coverWindowText(startsAt: string, endsAt: string): string {
+  const sameYear = vnParts(startsAt).year === vnParts(endsAt).year;
+  const start = sameYear ? `${formatDayMonth(startsAt)} ${formatTime(startsAt)}` : formatDateTime(startsAt);
+  return `${start} – ${formatDateTime(endsAt)}`;
+}
+
+/** Tương phản chữ trắng trên nền có độ chói tương đối L (WCAG): (1 + 0,05) / (L + 0,05). */
+export function whiteTextContrast(luminance: number): number {
+  return 1.05 / (Math.max(0, Math.min(1, luminance)) + 0.05);
+}
+
+/** Độ chói tương đối (WCAG) của màu sRGB 0–255. */
+export function relativeLuminance(r: number, g: number, b: number): number {
+  const ch = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+}
+
+/**
+ * Tương phản chữ trắng trên ảnh bìa sau lớp phủ: màu trung bình nửa trái của ảnh (r, g, b) trộn với #14152B theo độ phủ.
+ * Trang QT 13 lấy màu trung bình bằng canvas rồi gọi hàm này; dưới 4,5:1 thì không cho "Lưu và hẹn hiện".
+ */
+export function coverContrast(avg: { r: number; g: number; b: number }, overlay: number): number {
+  const hex = HOME_COVER_RULES.overlayColor.replace('#', '');
+  const o = { r: parseInt(hex.slice(0, 2), 16), g: parseInt(hex.slice(2, 4), 16), b: parseInt(hex.slice(4, 6), 16) };
+  const mix = (c: number, oc: number) => c * (1 - overlay) + oc * overlay;
+  return whiteTextContrast(relativeLuminance(mix(avg.r, o.r), mix(avg.g, o.g), mix(avg.b, o.b)));
+}
+
+/**
+ * Như coverContrast nhưng đo từng điểm ảnh (RGBA, VD từ canvas getImageData của nửa trái ảnh): trộn mỗi điểm với lớp
+ * phủ rồi lấy độ chói trung bình. Không có điểm ảnh nào → null.
+ */
+export function coverContrastFromPixels(rgba: ArrayLike<number>, overlay: number): number | null {
+  const hex = HOME_COVER_RULES.overlayColor.replace('#', '');
+  const o = [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i + 3 < rgba.length; i += 4) {
+    const mix = (k: number) => (rgba[i + k] ?? 0) * (1 - overlay) + (o[k] ?? 0) * overlay;
+    sum += relativeLuminance(mix(0), mix(1), mix(2));
+    n++;
+  }
+  return n ? whiteTextContrast(sum / n) : null;
+}
+
+const REFERRAL_LABEL: Record<ReferralStatus, OpsLabel> = {
+  pending: { text: 'Chờ chuyến đầu', tone: 'orange' },
+  rewarded: { text: 'Đã thưởng', tone: 'green' },
+  held: { text: 'Giữ để kiểm tra', tone: 'amber' },
+  expired: { text: 'Hết hạn', tone: 'grey' },
+  rejected: { text: 'Từ chối', tone: 'red' },
+};
+
+const SHOP_PHOTO_LABEL: Record<ShopPhotoStatus, OpsLabel> = {
+  pending: { text: 'Chờ duyệt', tone: 'amber' },
+  approved: { text: 'Đã duyệt', tone: 'green' },
+  rejected: { text: 'Từ chối', tone: 'red' },
+};
 
 export function createAdminOpsService(db: Db) {
   const nowIso = () => db.now().toISOString();
@@ -987,6 +1155,230 @@ export function createAdminOpsService(db: Db) {
         await log(`${active ? 'Chạy' : 'Tạm dừng'} mã Frego ${c.code}`);
       }
       return { message: active ? `Mã ${c.code} đang chạy.` : `Đã tạm dừng mã ${c.code}.` };
+    },
+
+    /* ───────────── QT 8 · Giới thiệu bạn bè ───────────── */
+
+    async getReferralAdmin(): Promise<ReferralAdminView> {
+      const now = db.now();
+      const cur = monthKey(now);
+      const R = POINTS_RULES.referral;
+      const [refs, profiles] = await Promise.all([
+        db.list('referrals', { order: { column: 'createdAt', ascending: false } }),
+        db.list('profiles'),
+      ]);
+      const byId = new Map(profiles.map((p) => [p.id, p]));
+      const who = (id: string) => {
+        const p = byId.get(id);
+        if (!p) return 'Tài khoản đã xóa';
+        return p.phone ? `${p.displayName || 'Chưa đặt tên'} · ${maskPhone(p.phone)}` : p.displayName || 'Khách';
+      };
+      // Hết hạn tính lúc đọc (như my_referrals): lượt chờ quá 30 ngày hiện "Hết hạn".
+      const statusOf = (r: (typeof refs)[number]): ReferralStatus =>
+        r.status === 'pending' && now.getTime() - new Date(r.createdAt).getTime() > R.qualifyDays * DAY_MS ? 'expired' : r.status;
+      const row = (r: (typeof refs)[number]): ReferralRowView => {
+        const st = statusOf(r);
+        return {
+          id: r.id,
+          referrerText: who(r.referrerId),
+          refereeText: who(r.refereeId),
+          createdText: `Nhập mã ${formatDate(r.createdAt)}`,
+          status: st,
+          label: REFERRAL_LABEL[st],
+          note: r.note,
+        };
+      };
+      const rewardedMonth = refs.filter((r) => r.status === 'rewarded' && r.rewardedAt && monthKey(r.rewardedAt) === cur).length;
+      const pending = refs.filter((r) => statusOf(r) === 'pending').length;
+      const held = refs.filter((r) => r.status === 'held');
+      return {
+        stats: {
+          rewarded: stat('Lượt giới thiệu được thưởng', formatNumber(rewardedMonth), 'tháng này, giờ Việt Nam'),
+          points: stat('Điểm giới thiệu đã phát', formatNumber(rewardedMonth * (R.referrer + R.referee)), `${R.referrer} người giới thiệu + ${R.referee} người mới mỗi lượt`),
+          pending: stat('Đang chờ chuyến đầu', formatNumber(pending), `trong ${R.qualifyDays} ngày kể từ lúc nhập mã`),
+          held: stat('Giữ để kiểm tra', formatNumber(held.length), held.length ? 'cần Duyệt hoặc Từ chối' : 'không có lượt nào'),
+        },
+        held: held.map(row),
+        recent: refs.slice(0, 20).map(row),
+        rulesText:
+          `Người giới thiệu +${R.referrer}, người mới +${R.referee} điểm khi người mới báo giá được cộng điểm lần đầu trong ${R.qualifyDays} ngày. ` +
+          `Nhập mã trong ${R.enterDays} ngày đầu. Tối đa ${R.monthlyCap} lượt thưởng mỗi người mỗi tháng; vượt mức hoặc tài khoản bị khóa thì giữ lại để kiểm tra.`,
+      };
+    },
+
+    /** Duyệt (cộng điểm cho cả hai bên) hoặc từ chối một lượt giới thiệu đang giữ. */
+    async setReferralStatus(id: string, status: 'rewarded' | 'rejected', note?: string | null): Promise<{ message: string }> {
+      if (status === 'rejected' && !note?.trim()) throw new Error('Nhập lý do từ chối.');
+      await db.rpc('admin_set_referral_status', { id, status, note: note?.trim() || null });
+      return {
+        message:
+          status === 'rewarded'
+            ? `Đã duyệt: cộng ${POINTS_RULES.referral.referrer} điểm cho người giới thiệu và ${POINTS_RULES.referral.referee} điểm cho người mới.`
+            : 'Đã từ chối lượt giới thiệu.',
+      };
+    },
+
+    /* ───────────── QT 13 · Ảnh bìa app ───────────── */
+
+    async listHomeCovers(): Promise<HomeCoverRowView[]> {
+      const now = db.now().getTime();
+      const [rows, profiles] = await Promise.all([
+        db.list('app_banners', { order: { column: 'startsAt', ascending: false } }),
+        db.list('profiles', { where: { role: 'admin' } }),
+      ]);
+      const byId = new Map(profiles.map((p) => [p.id, p]));
+      const liveId =
+        rows
+          .filter((b) => b.status === 'scheduled' && new Date(b.startsAt).getTime() <= now && new Date(b.endsAt).getTime() > now)
+          .sort((a, b) => (a.startsAt < b.startsAt ? 1 : -1))[0]?.id ?? null;
+      return rows.map((b) => {
+        const p = b.createdBy ? byId.get(b.createdBy) : null;
+        const ended = new Date(b.endsAt).getTime() <= now;
+        const label: OpsLabel =
+          b.status === 'draft'
+            ? { text: 'Nháp', tone: 'grey' }
+            : b.id === liveId
+              ? { text: 'Đang hiện', tone: 'green' }
+              : ended
+                ? { text: 'Hết hạn', tone: 'grey' }
+                : { text: 'Đã hẹn', tone: 'blue' };
+        return {
+          id: b.id,
+          title: b.title,
+          imageUrl: b.imageUrl,
+          storagePath: b.storagePath,
+          startsAt: b.startsAt,
+          endsAt: b.endsAt,
+          overlay: b.overlay,
+          status: b.status,
+          windowText: coverWindowText(b.startsAt, b.endsAt),
+          editorText: p
+            ? `${p.displayName} · ${p.adminRole ? ADMIN_ROLE_LABEL[p.adminRole].toLowerCase() : 'quản trị'} · ${formatDayMonth(b.updatedAt)}`
+            : `Frego · ${formatDate(b.updatedAt)}`,
+          live: b.id === liveId,
+          label,
+        };
+      });
+    },
+
+    /** Tạo / sửa ảnh bìa. "scheduled" không được trùng khung giờ với ảnh đã hẹn khác. Ghi nhật ký (QT 12). */
+    async saveHomeCover(input: HomeCoverInput): Promise<{ cover: AppBanner; message: string }> {
+      const title = String(input.title ?? '').trim().replace(/\s+/g, ' ');
+      if (!title) throw new Error('Nhập tên ảnh.');
+      if (title.length > 60) throw new Error('Tên ảnh tối đa 60 ký tự.');
+      const start = parseCoverDateTime(input.startsAt);
+      const end = parseCoverDateTime(input.endsAt);
+      if (!start) throw new Error('Thời gian bắt đầu chưa đúng, VD 28/11/2026 00:00.');
+      if (!end) throw new Error('Thời gian kết thúc chưa đúng, VD 30/11/2026 23:59.');
+      if (end.getTime() <= start.getTime()) throw new Error('Thời gian kết thúc phải sau thời gian bắt đầu.');
+      if (!HOME_COVER_RULES.overlays.includes(Number(input.overlay))) throw new Error('Lớp phủ chỉ chọn Không, 20%, 40% hoặc 60%.');
+      if (input.status !== 'draft' && input.status !== 'scheduled') throw new Error('Trạng thái không hợp lệ.');
+      const existing = input.id ? await db.get('app_banners', input.id) : null;
+      if (input.id && !existing) throw new Error('Không tìm thấy ảnh bìa.');
+      const imageUrl = input.imageUrl ?? existing?.imageUrl ?? '';
+      if (!imageUrl) throw new Error('Tải ảnh lên trước khi lưu.');
+      if (input.status === 'scheduled') {
+        if (end.getTime() <= db.now().getTime()) throw new Error('Thời gian kết thúc đã qua, chọn khung giờ khác.');
+        const others = await db.list('app_banners', { where: { status: 'scheduled' } });
+        const clash = others.find(
+          (b) => b.id !== input.id && new Date(b.startsAt).getTime() < end.getTime() && start.getTime() < new Date(b.endsAt).getTime(),
+        );
+        if (clash) throw new Error(`Trùng thời gian với ảnh "${clash.title}" (${coverWindowText(clash.startsAt, clash.endsAt)}).`);
+      }
+      const patch = {
+        title,
+        imageUrl,
+        storagePath: input.storagePath ?? existing?.storagePath ?? null,
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        overlay: Number(input.overlay),
+        status: input.status,
+        createdBy: db.currentUserId(),
+        updatedAt: db.now().toISOString(),
+      };
+      const cover = existing ? await db.update('app_banners', existing.id, patch) : await db.insert('app_banners', patch);
+      const windowText = coverWindowText(cover.startsAt, cover.endsAt);
+      await log(
+        input.status === 'scheduled'
+          ? `Hẹn hiện ảnh bìa app "${title}", ${windowText}, lớp phủ ${Math.round(cover.overlay * 100)}%`
+          : `Lưu nháp ảnh bìa app "${title}"`,
+      );
+      return {
+        cover,
+        message:
+          input.status === 'scheduled'
+            ? `Đã hẹn hiện từ ${formatTime(cover.startsAt)} ${formatDayMonth(cover.startsAt)} đến ${formatTime(cover.endsAt)} ${formatDate(cover.endsAt)}. Hết hạn app tự quay về ảnh mặc định.`
+            : `Đã lưu nháp "${title}".`,
+      };
+    },
+
+    /** Tải ảnh bìa (JPG/PNG/WebP ≤ 500 KB; kích thước 1170×630 do trang web kiểm trước vì cần trình duyệt đọc ảnh). */
+    async uploadHomeCover(file: Blob, fileName: string): Promise<{ imageUrl: string; storagePath: string }> {
+      const byName: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+      const contentType = file.type || byName[(fileName.split('.').pop() ?? '').toLowerCase()] || '';
+      if (!HOME_COVER_RULES.types.includes(contentType)) throw new Error('Ảnh phải là JPG, PNG hoặc WebP.');
+      if (!file.size) throw new Error('Chọn ảnh bìa.');
+      if (file.size > HOME_COVER_RULES.maxBytes) {
+        throw new Error(`Ảnh ${formatNumber(Math.ceil(file.size / 1024))} KB, tối đa ${formatNumber(HOME_COVER_RULES.maxBytes / 1024)} KB.`);
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+      return db.files.uploadHomeCover({ bytes, contentType, ext });
+    },
+
+    async deleteHomeCover(id: string): Promise<{ message: string }> {
+      const b = await db.get('app_banners', id);
+      if (!b) throw new Error('Không tìm thấy ảnh bìa.');
+      await db.remove('app_banners', id);
+      if (b.storagePath) {
+        try {
+          await db.files.removeHomeCover(b.storagePath);
+        } catch {
+          /* tệp còn lại trong kho không ảnh hưởng app */
+        }
+      }
+      await log(`Gỡ ảnh bìa app "${b.title}"`);
+      return { message: `Đã gỡ ảnh "${b.title}".` };
+    },
+
+    /* ───────────── Ảnh tại quán (hàng chờ duyệt) ───────────── */
+
+    async listShopPhotos(filter: ShopPhotoFilter = 'pending'): Promise<ShopPhotoQueueView> {
+      const all = await db.list('shop_photos', { order: { column: 'createdAt', ascending: false } });
+      const list = filter === 'pending' ? all.filter((p) => p.status === 'pending') : all;
+      const rows = await Promise.all(
+        list.slice(0, 100).map(async (p): Promise<ShopPhotoRowView> => {
+          const [biz, user, trip, imageUrl] = await Promise.all([
+            db.get('businesses', p.businessId),
+            db.get('profiles', p.userId),
+            db.get('trips', p.tripId),
+            db.files.checkinPhotoUrl(p.storagePath).catch(() => null),
+          ]);
+          return {
+            id: p.id,
+            imageUrl,
+            shopName: biz?.name ?? 'Quán đã xóa',
+            shopAddress: biz?.address ?? '',
+            userText: user ? [maskName(user.displayName), user.phone ? maskPhone(user.phone) : ''].filter(Boolean).join(' · ') : 'Tài khoản đã xóa',
+            distanceText: `Cách quán ${formatNumber(p.distanceM)} m`,
+            takenText: formatDateTime(p.takenAt),
+            tripText: trip ? `${trip.originLabel} → ${trip.destLabel} · ${formatDayMonth(trip.createdAt)} ${formatTime(trip.createdAt)}` : '',
+            submittedText: `Gửi ${formatDateTime(p.createdAt)}`,
+            status: p.status,
+            label: SHOP_PHOTO_LABEL[p.status],
+            rejectReason: p.rejectReason,
+            reviewedText: p.reviewedAt ? `${p.reviewedBy ?? 'Frego'} · ${formatDateTime(p.reviewedAt)}` : null,
+          };
+        }),
+      );
+      return { pendingCount: all.filter((p) => p.status === 'pending').length, rows };
+    },
+
+    /** Duyệt (+50 điểm, báo người dùng) hoặc từ chối (cần lý do) ảnh tại quán. */
+    async reviewShopPhoto(id: string, approve: boolean, reason?: string | null): Promise<{ message: string }> {
+      if (!approve && !reason?.trim()) throw new Error('Nhập lý do từ chối để gửi người dùng.');
+      await db.rpc('review_shop_photo', { id, approve, reason: reason?.trim() || null });
+      return { message: approve ? `Đã duyệt, cộng ${POINTS_RULES.shopPhoto} điểm cho người dùng.` : 'Đã từ chối ảnh, người dùng nhận được lý do.' };
     },
 
     /* ───────────── QT 9 · Thông báo ───────────── */

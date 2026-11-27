@@ -31,3 +31,22 @@ export async function setFregoCodeActiveAction(formData: FormData) {
   await svc.setFregoCodeActive(String(formData.get('id') ?? ''), formData.get('active') === 'true');
   revalidatePath('/quan-tri/diem');
 }
+
+export type ReferralDecisionState = { ok: boolean; message: string; field?: 'note'; at: number } | null;
+
+/** Tab Giới thiệu: Duyệt (cộng điểm cả hai bên) / Từ chối (cần ghi chú) một lượt đang giữ để kiểm tra. */
+export async function setReferralStatusAction(_prev: ReferralDecisionState, formData: FormData): Promise<ReferralDecisionState> {
+  const { svc } = await adminOpsService();
+  const id = String(formData.get('id') ?? '');
+  const status = String(formData.get('status') ?? '');
+  const note = String(formData.get('note') ?? '').trim();
+  if (status !== 'rewarded' && status !== 'rejected') return { ok: false, message: 'Chọn Duyệt hoặc Từ chối.', at: Date.now() };
+  if (status === 'rejected' && !note) return { ok: false, field: 'note', message: 'Nhập lý do trước khi từ chối.', at: Date.now() };
+  try {
+    const r = await svc.setReferralStatus(id, status, note || null);
+    revalidatePath('/quan-tri/diem');
+    return { ok: true, message: r.message, at: Date.now() };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'Chưa lưu được. Thử lại.', at: Date.now() };
+  }
+}

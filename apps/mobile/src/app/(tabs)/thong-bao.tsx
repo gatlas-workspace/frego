@@ -7,6 +7,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NotificationCategory, NotificationView } from '@frego/core';
 import { Button, NotifItem, SectionTitle, T, Tabs } from '@/components/ui';
+import { Rise } from '@/components/motion';
 import { usePullRefresh } from '@/components/screens/account/usePullRefresh';
 import { ErrorView, InlineError, LoadingView } from '@/components/screens/account/ScreenState';
 import { refreshAll, useApi } from '@/lib/api';
@@ -92,9 +93,9 @@ export default function ThongBaoScreen() {
         <SectionTitle text={title} size="sm" nativeID={id} />
       )}
       <View accessibilityRole="list" accessibilityLabel={title} style={{ gap: 12 }}>
-        {items.map((n) => (
+        {items.map((n, i) => (
+          <Rise key={n.id} index={i}>
           <NotifItem
-            key={n.id}
             icon={n.icon}
             tone={n.tone}
             logo={n.logo}
@@ -105,6 +106,7 @@ export default function ThongBaoScreen() {
             unread={n.unread}
             onPress={() => open(n)}
           />
+          </Rise>
         ))}
       </View>
     </View>

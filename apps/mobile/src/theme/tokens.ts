@@ -6,7 +6,7 @@ import { brand } from '@frego/core';
 
 export const colors = {
   /** Nền trang */
-  bg: '#F4F5FA',
+  bg: '#F5F6FA',
   /** Bề mặt thẻ */
   surface: '#FFFFFF',
   /** Nền phụ, ô nhập */
@@ -69,6 +69,23 @@ export const colors = {
   /** Vùng bán kính quanh quán trên bản đồ nhỏ */
   areaFill: 'rgba(194,65,12,0.10)',
 
+  /** Ảnh bìa mặc định Trang chủ v3 "Sài Gòn tím" (khi quản trị chưa đặt ảnh) */
+  coverSkyTop: '#4442DC',
+  coverSkyBottom: '#2C2AA8',
+  coverGlow: '#7C7AF6',
+  coverRing: '#5250E0',
+  coverBack: '#4B49DE',
+  coverTower: '#5856E6',
+  coverTowerLine: '#6E6CF0',
+  coverTower2: '#5452E4',
+  coverFront: '#605EEA',
+  coverWindow: '#8A88F5',
+  coverRoadTop: '#2A2898',
+  coverRoadBottom: '#1F1E7C',
+  coverCarGlass: '#C9D4F2',
+  /** Lớp phủ tối trên ảnh bìa do quản trị tải lên (độ mờ do quản trị chọn) */
+  coverOverlay: '#14152B',
+
   /** Banner trang chủ: hai vòng trang trí và thẻ nghiêng phía sau */
   bannerCircle1: '#4B49E0',
   bannerCircle2: '#5A58EA',
@@ -113,8 +130,8 @@ export const colors = {
 } as const;
 
 export const radius = {
-  /** Thẻ */
-  card: 24,
+  /** Thẻ (UI v3: 16, phẳng hơn) */
+  card: 16,
   /** Khối, ô nhập, nút */
   block: 16,
   /** Phần tử nhỏ */
@@ -122,14 +139,15 @@ export const radius = {
   /** Nhãn, viên */
   pill: 999,
   /** Tấm trượt trên bản đồ */
-  sheet: 28,
+  sheet: 24,
 } as const;
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24 } as const;
 
 /** Bóng đổ (RN 0.88 hỗ trợ boxShadow dạng chuỗi CSS trên iOS, Android, web). */
 export const shadow = {
-  card: '0 1px 2px rgba(20,21,43,0.05), 0 12px 28px -14px rgba(41,43,120,0.28)',
+  /** UI v3: thẻ phẳng, viền 1px `line` + bóng rất nhẹ */
+  card: '0 1px 2px rgba(20,21,43,0.04)',
   bottomBar: '0 -10px 28px -16px rgba(41,43,120,0.30)',
   sheet: '0 -10px 30px -12px rgba(20,21,43,0.25)',
   float: '0 2px 8px rgba(20,21,43,0.16)',
@@ -180,6 +198,9 @@ export const fontFamily: Record<FontWeight, string> = {
 
 /** Vùng chạm tối thiểu. */
 export const HIT = 44;
+
+/** Thời lượng hiệu ứng UI v3 (ms): nhấn, hiện dần, tấm trượt; trễ nối tiếp giữa các mục danh sách. */
+export const motion = { fast: 180, base: 420, slow: 550, stagger: 70 } as const;
 
 /** Khung thiết kế: 390 × 844, lề trang 20. */
 export const layout = { gutter: 20, topInset: 56, headerTop: 48 } as const;

@@ -319,4 +319,167 @@ do $$ begin
 end $$;
 do $$ begin perform pg_temp.reset(); end $$;
 
+-- ───────────── UI v3: giới thiệu bạn bè, ảnh bìa, ảnh tại quán (20261127001200_v3_referral_cover_photo.sql) ─────────────
+
+-- Hồ sơ cũ có mã giới thiệu; seed giữ đúng mã mẫu.
+do $$ begin
+  assert (select count(*) from public.profiles where referral_code is null) = 0, 'mọi hồ sơ có mã giới thiệu';
+  assert (select referral_code from public.profiles where id = '00000000-0000-4000-8000-000000000001') = 'MINHA7K', 'mã mẫu của Minh Anh';
+end $$;
+
+-- Tài khoản mới (đăng nhập số điện thoại hôm nay) để thử nhập mã.
+insert into auth.users (instance_id, id, aud, role, phone, created_at)
+values ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-0000000000d1', 'authenticated', 'authenticated', '84900000001', now());
+update public.profiles set display_name = 'Tú Lê' where id = '00000000-0000-4000-8000-0000000000d1';
+do $$ begin
+  assert (select referral_code from public.profiles where id = '00000000-0000-4000-8000-0000000000d1') ~ '^TUL[A-Z2-9]{3}$', 'mã sinh theo tên (TUL + 3 ký tự)';
+end $$;
+
+-- Khách chưa đăng nhập: chỉ đọc tên đã che của chủ mã, không đọc bảng referrals.
+set role anon;
+do $$ begin
+  assert public.referral_owner_name('{"code":"minha7k"}')->>'owner_name' = 'Minh A.', 'trang mời: tên chủ mã đã che';
+  assert public.referral_owner_name('{"code":"KHONGCO"}')->>'owner_name' is null, 'mã không có → null';
+  assert public.active_home_cover('{}') is null, 'chưa có ảnh bìa → null';
+end $$;
+do $$ begin
+  perform 1 from public.referrals;
+  raise exception 'anon không được đọc referrals';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000d1'); end $$;
+do $$
+declare r jsonb; t jsonb;
+begin
+  r := public.check_referral_code('{"code":"lan7qx"}');
+  assert (r->>'ok')::boolean and r->>'owner_name' = 'Lan N.', 'LAN7QX hợp lệ, tên đã che';
+  r := public.check_referral_code(jsonb_build_object('code', (select referral_code from public.profiles)));
+  assert r->>'reason' = 'own', 'không tự nhập mã của mình';
+  r := public.check_referral_code('{"code":"ZZZZZZ"}');
+  assert r->>'reason' = 'not_found' and r->>'message' like 'Không tìm thấy mã%', 'mã sai';
+  r := public.apply_referral_code('{"code":"LAN7QX"}');
+  assert r->>'owner_name' = 'Lan N.', 'nhập mã thành công';
+  begin
+    perform public.apply_referral_code('{"code":"MINHA7K"}');
+    raise exception 'không được nhập mã lần hai';
+  exception when raise_exception then
+    if sqlerrm not like 'Bạn đã nhập mã giới thiệu rồi%' then raise; end if;
+  end;
+  assert (select count(*) from public.referrals) = 1, 'chỉ thấy lượt của mình';
+
+  -- Báo giá chuyến đầu được cộng điểm → +100 cho người mới (ngoài điểm báo giá).
+  t := public.record_trip('{"originLabel":"Nhà","destPlaceId":"ben-thanh","destLabel":"Chợ Bến Thành","distanceKm":3,"durationMin":10,"attached":[],"chosenService":"grab-bike","comparedCount":3}');
+  r := public.report_price(jsonb_build_object('tripId', t->>'id', 'verdict', 'within'));
+  assert (r->>'points')::int = (r->>'points_awarded')::int + 100, 'người mới +100 điểm giới thiệu';
+  r := public.my_referrals('{}');
+  assert r->'entered_by'->>'status' = 'rewarded' and r->'entered_by'->>'name' = 'Lan N.', 'lượt đã thưởng';
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+do $$ begin
+  assert (select points from public.profiles where id = '00000000-0000-4000-8000-0000000000c1') = 300, 'Lan 100 → 300 (+200)';
+  assert (select count(*) from public.notifications where user_id = '00000000-0000-4000-8000-0000000000c1' and link = '/gioi-thieu') = 1, 'báo người giới thiệu';
+  assert (select count(*) from public.points_ledger where user_id = '00000000-0000-4000-8000-0000000000d1' and trip_id is null and delta = 100) = 1, 'thưởng đúng một lần, không gắn chuyến';
+end $$;
+
+-- Minh Anh xem danh sách bạn đã mời (tên đã che).
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000001'); end $$;
+do $$
+declare r jsonb;
+begin
+  r := public.my_referrals('{}');
+  assert r->>'code' = 'MINHA7K' and jsonb_array_length(r->'friends') = 4, 'Minh Anh có 4 bạn';
+  assert not (r->'friends')::text like '%+849%', 'không lộ số điện thoại';
+  begin
+    perform public.admin_set_referral_status('{"id":"ref-vy","status":"rewarded"}');
+    raise exception 'người dùng không được đổi trạng thái giới thiệu';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.app_banners (title, image_url, starts_at, ends_at) values ('X', 'https://x/y.jpg', now(), now() + interval '1 day');
+    raise exception 'người dùng không được thêm ảnh bìa';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+
+-- Ảnh tại quán: Gia Huy chụp ở Cà phê Mây sau chuyến dùng mã của quán (chuyến tạo ở khối record_ad_view phía trên).
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-000000000002'); end $$;
+do $$
+declare tid text; r jsonb;
+begin
+  select id into tid from public.trips where attached @> '[{"source":"sponsor"}]' order by created_at desc limit 1;
+  begin
+    perform public.submit_shop_photo(jsonb_build_object('tripId', tid, 'storagePath', '00000000-0000-4000-8000-000000000002/a.jpg',
+      'sha256', repeat('a', 64), 'takenAt', now(), 'lat', 10.7833, 'lng', 106.699));
+    raise exception 'ảnh xa quán phải bị chặn';
+  exception when raise_exception then
+    if sqlerrm not like 'Vị trí chụp cách quán%' then raise; end if;
+  end;
+  begin
+    perform public.submit_shop_photo(jsonb_build_object('tripId', tid, 'storagePath', '00000000-0000-4000-8000-000000000001/a.jpg',
+      'sha256', repeat('a', 64), 'takenAt', now(), 'lat', 10.7734, 'lng', 106.699));
+    raise exception 'ảnh ở thư mục người khác phải bị chặn';
+  exception when raise_exception then
+    if sqlerrm <> 'Ảnh không hợp lệ' then raise; end if;
+  end;
+  r := public.submit_shop_photo(jsonb_build_object('tripId', tid, 'storagePath', '00000000-0000-4000-8000-000000000002/a.jpg',
+    'sha256', repeat('a', 64), 'takenAt', now(), 'lat', 10.7734, 'lng', 106.699));
+  assert r->>'status' = 'pending' and (r->>'distance_m')::int <= 150, 'ảnh tại quán chờ duyệt';
+  begin
+    perform public.submit_shop_photo(jsonb_build_object('tripId', tid, 'storagePath', '00000000-0000-4000-8000-000000000002/b.jpg',
+      'sha256', repeat('b', 64), 'takenAt', now(), 'lat', 10.7734, 'lng', 106.699));
+    raise exception 'mỗi chuyến một ảnh';
+  exception when raise_exception then
+    if sqlerrm not like 'Chuyến này đã gửi ảnh%' then raise; end if;
+  end;
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+
+-- Chủ quán không thấy ảnh, người chụp; chỉ có số tổng.
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000b1'); end $$;
+do $$ begin
+  assert (select count(*) from public.shop_photos) = 0, 'chủ quán không đọc shop_photos';
+  assert (select count(*) from public.referrals) = 0, 'chủ quán không đọc referrals của người khác';
+  assert (public.business_checkin_count('{"businessId":"biz-cafe-may"}')->>'count')::int = 0, 'chưa duyệt thì chưa tính';
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+
+-- Quản trị ops: duyệt ảnh (+50 đúng một lần), hẹn ảnh bìa (không trùng khung giờ).
+do $$ begin perform pg_temp.act_as('00000000-0000-4000-8000-0000000000a1'); end $$;
+do $$
+declare pid text; before int; r jsonb;
+begin
+  select id into pid from public.shop_photos where user_id = '00000000-0000-4000-8000-000000000002' and status = 'pending';
+  select points into before from public.profiles where id = '00000000-0000-4000-8000-000000000002';
+  r := public.review_shop_photo(jsonb_build_object('id', pid, 'approve', true));
+  assert r->>'status' = 'approved', 'đã duyệt';
+  assert (select points from public.profiles where id = '00000000-0000-4000-8000-000000000002') = before + 50, '+50 điểm';
+  begin
+    perform public.review_shop_photo(jsonb_build_object('id', pid, 'approve', true));
+    raise exception 'không duyệt hai lần';
+  exception when raise_exception then
+    if sqlerrm <> 'Ảnh này đã được xử lý' then raise; end if;
+  end;
+
+  insert into public.app_banners (title, image_url, starts_at, ends_at, overlay, status)
+  values ('Ảnh thử', 'https://example.com/a.jpg', now() - interval '1 hour', now() + interval '1 day', 0.4, 'scheduled');
+  begin
+    insert into public.app_banners (title, image_url, starts_at, ends_at, overlay, status)
+    values ('Trùng giờ', 'https://example.com/b.jpg', now(), now() + interval '2 days', 0.4, 'scheduled');
+    raise exception 'ảnh bìa trùng khung giờ phải bị chặn';
+  exception when exclusion_violation then null;
+  end;
+
+  r := public.admin_set_referral_status('{"id":"ref-vy","status":"rejected","note":"Thử"}');
+  assert r->>'status' = 'rejected', 'ops từ chối lượt giới thiệu';
+end $$;
+do $$ begin perform pg_temp.reset(); end $$;
+set role anon;
+do $$ begin
+  assert public.active_home_cover('{}')->>'title' = 'Ảnh thử', 'app thấy ảnh bìa đang hiện';
+end $$;
+reset role;
+
 \echo '  RLS + RPC: tất cả kiểm tra đều đúng'

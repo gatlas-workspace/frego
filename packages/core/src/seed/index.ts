@@ -44,6 +44,9 @@ const empty = (): Seed => ({
   ad_banners: [],
   gmail_connections: [],
   gmail_receipts: [],
+  referrals: [],
+  app_banners: [],
+  shop_photos: [],
 });
 
 /** Seed đầy đủ (bản sao mới mỗi lần gọi). */
@@ -57,7 +60,7 @@ export function createSeed(): Seed {
   add({
     places: base.places,
     fare_tables: base.fareTables,
-    profiles: base.profiles,
+    profiles: [...base.profiles, ...base.friendProfiles],
     consents: base.consents,
     notification_prefs: base.notificationPrefs,
     saved_places: base.savedPlaces,
@@ -76,6 +79,8 @@ export function createSeed(): Seed {
     points_ledger: base.pointsLedger,
     notifications: base.notifications,
     ad_banners: base.adBanners,
+    referrals: base.referrals,
+    shop_photos: base.shopPhotos,
   });
   add(businessSeed);
   add(adminSeed);

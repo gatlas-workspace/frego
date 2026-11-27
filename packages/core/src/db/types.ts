@@ -12,6 +12,9 @@ import type {
   CategoryKey,
   Profile,
   PriceVerdict,
+  Referral,
+  ReferralStatus,
+  ShopPhoto,
   ProviderId,
   ServiceKey,
   Trip,
@@ -109,6 +112,71 @@ export interface Rpcs {
    * điểm: lệch ≤ 30%, tối đa 300 điểm/ngày). Không ghi trùng: mỗi (userId, messageId) một lần.
    */
   record_receipt: { args: RecordReceiptArgs; result: RecordReceiptResult };
+
+  /* ───── Giới thiệu bạn bè (supabase/migrations/20261127001200_v3_referral_cover_photo.sql) ───── */
+
+  /** Kiểm tra mã trước khi nhập (không ghi gì). */
+  check_referral_code: { args: { code: string }; result: ReferralCheckResult };
+  /** Nhập mã giới thiệu (mỗi tài khoản 1 lần, trong 7 ngày đầu). Lỗi: ném câu tiếng Việt. */
+  apply_referral_code: { args: { code: string }; result: { ownerName: string } };
+  /** Dữ liệu màn Giới thiệu bạn bè của người đang đăng nhập (tên bạn đã che, không có số điện thoại). */
+  my_referrals: { args: Record<string, never>; result: MyReferralsResult };
+  /** Trang mời công khai /moi/[ma]: chỉ trả tên đã che của chủ mã (anon gọi được). */
+  referral_owner_name: { args: { code: string }; result: { ownerName: string | null } };
+  /** Quản trị (ops): đổi trạng thái lượt giới thiệu. "rewarded" từ held/pending thì cộng điểm cho cả hai bên. */
+  admin_set_referral_status: {
+    args: { id: string; status: Extract<ReferralStatus, 'rewarded' | 'rejected' | 'held'>; note?: string | null };
+    result: Referral;
+  };
+
+  /* ───── Ảnh bìa Trang chủ ───── */
+
+  /** Ảnh bìa đang hiện: bản "scheduled" có khung giờ chứa hiện tại (bắt đầu muộn nhất thắng), không có thì null. */
+  active_home_cover: { args: Record<string, never>; result: { imageUrl: string; overlay: number; title: string } | null };
+
+  /* ───── Ảnh tại quán ───── */
+
+  /** Gửi ảnh tại quán cho chuyến dùng mã của quán tài trợ (chờ Frego duyệt). */
+  submit_shop_photo: {
+    args: { tripId: string; storagePath: string; sha256: string; takenAt: string; lat: number; lng: number };
+    result: ShopPhoto;
+  };
+  /** Quản trị (ops): duyệt (+50 điểm, thông báo) hoặc từ chối (cần lý do, thông báo). */
+  review_shop_photo: { args: { id: string; approve: boolean; reason?: string | null }; result: ShopPhoto };
+  /** Doanh nghiệp (thành viên quán) / quản trị: số lượt check-in có ảnh đã duyệt của quán — không ảnh, không người chụp. */
+  business_checkin_count: { args: { businessId: string }; result: { count: number } };
+}
+
+export type ReferralCheckReason = 'not_found' | 'own' | 'already' | 'too_late' | 'guest';
+
+/**
+ * Kết quả kiểm tra mã giới thiệu. `ownerName` đã che ("Lan N."). Khi không hợp lệ, `message` là câu tiếng Việt để hiện
+ * (trùng câu lỗi của apply_referral_code). Mã của tài khoản tạo sau người nhập trả reason "not_found" kèm message riêng.
+ */
+export type ReferralCheckResult = { ok: true; ownerName: string } | { ok: false; reason: ReferralCheckReason; message: string };
+
+export interface MyReferralFriend {
+  id: string;
+  /** Tên đã che: "Lan N." */
+  name: string;
+  status: ReferralStatus;
+  createdAt: string;
+  qualifiedAt: string | null;
+  rewardedAt: string | null;
+}
+
+export interface MyReferralsResult {
+  code: string;
+  /** Lúc tạo tài khoản (tính hạn 7 ngày nhập mã) */
+  accountCreatedAt: string;
+  /** Khách ẩn danh (chưa đăng nhập số điện thoại) */
+  guest: boolean;
+  /** Số lượt được thưởng tháng này (giờ VN) của người đang đăng nhập với vai người giới thiệu */
+  monthRewarded: number;
+  /** Bạn đã mời, mới nhất trước */
+  friends: MyReferralFriend[];
+  /** Người giới thiệu của mình (nếu đã nhập mã) */
+  enteredBy: { name: string; status: ReferralStatus; createdAt: string } | null;
 }
 
 export interface RecordReceiptArgs {
@@ -146,6 +214,17 @@ export interface FileStore {
   publish(ref: string): Promise<string>;
   /** Logo quán: tải thẳng lên vùng công khai `business-logos/<businessId>/…` (app hiện ngay), trả URL công khai. */
   uploadLogo(businessId: string, file: { bytes: Uint8Array; contentType: string; ext: string }): Promise<string>;
+  /** Ảnh bìa Trang chủ (quản trị ops): bucket công khai `app-banners`. DEMO: data URL. */
+  uploadHomeCover(file: { bytes: Uint8Array; contentType: string; ext: string }): Promise<{ imageUrl: string; storagePath: string }>;
+  /** Gỡ tệp ảnh bìa khỏi kho (bỏ qua nếu không có). */
+  removeHomeCover(storagePath: string): Promise<void>;
+  /**
+   * Ảnh tại quán: bucket riêng `checkin-photos/<userId>/…` (chỉ chủ ảnh tải lên, quản trị xem). Trả đường dẫn trong bucket.
+   * `{ uri }`: ảnh chọn từ máy (React Native) khi không đọc được byte (DEMO giữ nguyên uri để xem).
+   */
+  uploadCheckinPhoto(userId: string, file: { bytes: Uint8Array; contentType: string; ext: string } | { uri: string }): Promise<string>;
+  /** URL xem ảnh tại quán (URL ký 1 giờ); null nếu không có. */
+  checkinPhotoUrl(storagePath: string): Promise<string | null>;
 }
 
 export type RpcName = keyof Rpcs;

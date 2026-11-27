@@ -230,3 +230,80 @@ Ngày: 27/11/2026 · Trạng thái: **đã làm xong 27/11/2026** (trừ thử t
 - Đồng ý thêm `react-native-maps`? Bản web của app: nền phẳng (không thêm gì) hay Leaflet + OSM (thêm `leaflet`, `react-leaflet`)?
 - Bán kính tìm quán quanh điểm đến: 1,5 km?
 - Có Google Maps API key cho Android chưa (hoặc tạm chỉ kiểm tra trên iOS và web)?
+
+# Kế hoạch: giới thiệu bạn bè (referral) — CHỜ DUYỆT
+
+## Mục tiêu
+Người dùng có mã giới thiệu riêng, chia sẻ cho bạn. Bạn tải app, đăng nhập bằng số điện thoại, nhập mã. Khi bạn mới **báo giá thật chuyến đầu tiên**, cả hai được cộng điểm; điểm dùng để đổi voucher ở màn Điểm thưởng như hiện nay (500 điểm → Be xe máy −10.000đ…).
+
+## Tham khảo
+- Xanh SM: người được giới thiệu điền mã khi đăng ký, hai bên cùng nhận quà; cấm tạo nhiều tài khoản, mua bán mã, dùng bot; hãng có quyền dừng chương trình.
+- Thực hành chống gian lận: chỉ thưởng khi có hành động thật (không thưởng lúc đăng ký), có trần số lượt, giữ để kiểm tra khi bất thường.
+- Pháp lý VN: chỉ **một tầng** (không thưởng cho người giới thiệu của người giới thiệu) và thưởng gắn với việc người mới thật sự dùng dịch vụ, tránh dáng dấp đa cấp (NĐ 40/2018). Thể lệ hiển thị trong app. Việc có cần thông báo khuyến mại với Sở Công Thương (NĐ 81/2018, sửa bởi NĐ 128/2024 và NĐ 239/2026) cần người phụ trách pháp lý xác nhận trước khi chạy thật.
+
+## Quy tắc đề xuất (số nằm trong `POINTS_RULES.referral`, đổi được)
+| Mục | Đề xuất |
+|---|---|
+| Người giới thiệu nhận | 200 điểm / bạn đạt điều kiện |
+| Người mới nhận | 100 điểm khi đạt điều kiện |
+| Điều kiện đạt | Lần báo giá đầu tiên được cộng điểm (một chạm, nhập số tiền hợp lệ hoặc biên nhận) trong 30 ngày kể từ khi nhập mã |
+| Nhập mã khi nào | Trong 7 ngày đầu sau khi tạo tài khoản; mỗi tài khoản 1 lần, không đổi được |
+| Ai được nhập | Tài khoản đăng nhập số điện thoại (khách ẩn danh không được); không tự giới thiệu; không nhập mã của người đăng ký sau mình |
+| Trần | Người giới thiệu tối đa 10 lượt được thưởng mỗi tháng (giờ VN); vượt thì lượt đó "giữ lại để kiểm tra" |
+| Tài khoản khóa | Không cộng; lượt chuyển "giữ lại để kiểm tra" (held) để quản trị xem ở QT 8 |
+| Điểm giới thiệu | Không tính vào trần 300 điểm báo giá/ngày |
+
+## Việc cần làm
+1. **Dữ liệu** (`packages/core` + migration mới `supabase/migrations/2026112700xx_referrals.sql`)
+   - `profiles.referral_code` (6–7 ký tự, bỏ ký tự dễ nhầm 0/O/1/I, duy nhất), sinh khi tạo hồ sơ; điền cho tài khoản cũ.
+   - Bảng `referrals(id, referrer_id, referee_id unique, status pending|rewarded|held|expired|rejected, created_at, qualified_at, rewarded_at, note)`, bật RLS: người dùng chỉ đọc dòng mình là người giới thiệu hoặc người được giới thiệu; doanh nghiệp không thấy; quản trị ops/support đọc, ops sửa trạng thái.
+   - RPC (viết cả JS trong `memory.ts` lẫn SQL): `apply_referral_code({code})`, `my_referrals()` (tên bạn che bớt: "Lan N.", trạng thái, điểm), cộng thưởng ngay trong `report_price` và nhánh biên nhận Gmail khi đây là lần báo giá được cộng điểm đầu tiên; `admin_set_referral_status` cho QT.
+   - Thông báo `points` cho người giới thiệu: "Lan N. vừa hoàn tất chuyến đầu, bạn được +200 điểm".
+2. **Dịch vụ** `createUserService`: `myReferral()` (mã, link, số bạn, điểm đã nhận, danh sách), `applyReferralCode(code)`; `createAdminService`: thống kê + danh sách cần kiểm tra.
+3. **App** (`apps/mobile`)
+   - Màn mới `gioi-thieu.tsx`: mã lớn + "Chép mã" (có phương án dự phòng khi không chép được), "Chia sẻ" bằng `Share` có sẵn của React Native (không thêm thư viện), 3 bước cách nhận thưởng, danh sách bạn với trạng thái, thể lệ ngắn.
+   - Ô "Mã giới thiệu · nếu có" (ô thường, không làm nổi) ở cuối màn Thông tin (`thong-tin.tsx`) khi tạo tài khoản mới — chỉ tài khoản mới thấy, đã xác thực OTP; không hiện ở chế độ sửa từ Tài khoản (`?tu=tai-khoan`). Mở từ link `/moi/<mã>` thì điền sẵn. Mã hợp lệ vẫn được ghi nhận khi bấm "Bỏ qua, điền sau". Ai bỏ qua vẫn nhập được ở màn Giới thiệu trong 7 ngày đầu.
+   - Lối vào: hàng "Giới thiệu bạn bè · +200 điểm" ở Tài khoản và mục "Cách kiếm điểm" trong Điểm thưởng.
+4. **Web** (`apps/web`): trang `/moi/[ma]` hiện mã, nút chép (có dự phòng cho trình duyệt Zalo/Facebook), nút tải app; chưa làm tự điền mã sau khi cài (deferred deep link — để sau).
+5. **Quản trị**: trên trang Điểm và mã (QT 8) thêm khối "Giới thiệu": số lượt tháng này, điểm đã phát, danh sách "giữ lại để kiểm tra" với nút Duyệt/Từ chối.
+6. **Canvas UI v3** (tùy chọn): thêm 1 bảng "Giới thiệu bạn bè" cùng phong cách.
+7. **Kiểm tra**: vitest cho apply (mã sai, tự giới thiệu, quá 7 ngày, nhập lần 2, khách ẩn danh), thưởng khi báo giá đầu (đúng một lần, cả hai bên), trần 10/tháng, tài khoản khóa, hết hạn 30 ngày, RLS; chạy `pnpm test`, `pnpm typecheck`, `pnpm lint`; thử trên web của app.
+
+## Chưa làm trong đợt này
+Tự điền mã sau khi cài từ link (cần Play Install Referrer/deep link), nhận diện thiết bị trùng, thưởng bằng tiền mặt.
+
+## Cần bạn chốt
+- Mức thưởng 200/100 điểm và điều kiện "báo giá chuyến đầu" có ổn không?
+- Có vẽ thêm màn Giới thiệu trên canvas UI v3 không?
+
+# Kế hoạch: đưa UI v3 vào code (bản 3.0) — ĐÃ DUYỆT 27/11/2026 (làm hết 6 GĐ, thưởng giới thiệu 200/100, làm luôn ảnh tại quán)
+
+## Mục tiêu
+App người dùng (`apps/mobile`) đổi sang giao diện UI v3 trên canvas (29 màn, trang "UI v3 · gọn, chuyên nghiệp"), kèm các tính năng mới đã vẽ: giới thiệu bạn bè, ảnh bìa Trang chủ đổi được ở quản trị (QT 13), Ví lần đầu, Tài khoản khách, trang mời `/moi/[ma]`. Không thêm thư viện: hiệu ứng dùng `Animated` có sẵn của React Native.
+
+## Nguyên tắc tối ưu code
+- **Token trước, màn sau:** sửa `theme/tokens.ts` theo v3 (bo góc thẻ 16, viền 1px `#E8EAF2` thay bóng đổ đậm, nền `#F5F6FA`), để phần lớn màn đổi theo mà không sửa từng chỗ.
+- **Thành phần dùng chung thay vì style rời:** thêm `HeroHeader` (dải màu + ảnh bìa), `SegmentTabs` (tab có huy hiệu số), `PriceOption` (hàng giá kiểu So giá v3), `EmptyState`, `ReferralCodeField`; màn chỉ ghép thành phần.
+- **Một bộ hiệu ứng nhỏ** trong `components/motion/`: `Rise` (hiện dần, có thứ tự), `SlideUp` (tấm trượt), `Pop`, `Shimmer` (một vòng lặp dùng chung cho mọi khung xương), `Fill` (thanh tiến độ), `pressScale` cho `Button`/`ListRow`. Tất cả `useNativeDriver: true`, tắt khi máy bật "giảm chuyển động" (`AccessibilityInfo`).
+- **Danh sách dài dùng `FlatList`** (Thông báo, Lịch sử, Ví công khai); danh sách ngắn giữ `map`. Hàng danh sách bọc `memo`, hàm xử lý ổn định để không vẽ lại cả danh sách khi bấm.
+- **Truy vấn:** giữ React Query, dùng `select` để màn chỉ nhận phần cần; ảnh bìa và mã giới thiệu cache dài (`staleTime`).
+- **Tách màn quá dài** (`lien-ket.tsx` 417 dòng, `ma/[id].tsx`, `tim-kiem.tsx`) thành phần con khi đụng tới.
+- Thành phần v2 không còn dùng sau khi chuyển (`Banner`, `DealRow`, `Shortcut`…) sẽ liệt kê để bạn duyệt xóa, không tự xóa.
+
+## Giai đoạn
+**GĐ 1 · Nền tảng** — token v3, bộ hiệu ứng, `HeroHeader` + `UiBannerTrangChu` (SVG Sài Gòn tím, cảnh dự phòng khi không có ảnh), `SegmentTabs`, `EmptyState`, sửa `Button`/`ListRow`/`Sheet` cho nhấn thu nhỏ và trượt lên.
+
+**GĐ 2 · Luồng đặt xe (hàng 1–2 canvas)** — Trang chủ (ảnh bìa, lời chào + nút điểm một hàng, ưu đãi cuộn ngang có dừng đúng thẻ), Tìm kiếm, Điểm đón, Chọn trên bản đồ, Thêm địa điểm (chỉnh nhẹ), Gắn voucher (đầu nhóm gọn), So giá (mã + chip số tiền giảm cạnh giá, "tới nơi ~giờ", khung xương khi đổi loại xe, tuyến đường vẽ dần), Khách: đăng nhập để nhận mã quán, Quảng cáo, Mở app, Báo giá.
+
+**GĐ 3 · Ví, điểm, tài khoản (hàng 3–4)** — Ví (tab + huy hiệu, Ví lần đầu trống), Chi tiết voucher/mã, Điểm thưởng (thanh điểm chạy, dòng Giới thiệu), Tài khoản (thẻ Giới thiệu), Tài khoản khách, Lịch sử, Liên kết, Thông báo, Cài đặt thông báo; onboarding (Chào mừng có thẻ trôi nhẹ, ô OTP nhấp nháy, ô mã giới thiệu cuối màn Thông tin).
+
+**GĐ 4 · Giới thiệu bạn bè (theo mục kế hoạch referral ở trên)** — core + `memory.ts` + migration SQL (`referrals`, `profiles.referral_code`, RPC `apply_referral_code`, `my_referrals`, cộng thưởng trong `report_price`), màn `gioi-thieu.tsx`, trang web `/moi/[ma]`, test vitest.
+
+**GĐ 5 · Ảnh bìa đổi được** — bảng `app_banners` (ảnh, thời gian hiện, lớp phủ, trạng thái) + kho ảnh Supabase Storage (đọc công khai, chỉ quản trị ops ghi), RPC `active_banner`, `createAdminOpsService` thêm CRUD; web quản trị trang `/quan-tri/anh-bia` (QT 13) có tải ảnh, kiểm 1170×630 ≤ 500 KB, lớp phủ, tương phản; app đọc ảnh đang hiện, lỗi thì dùng SVG mặc định.
+
+**GĐ 6 · Kiểm tra** — `pnpm test`, `pnpm typecheck`, `pnpm lint`; chạy bản web của app và web quản trị, so từng màn với canvas; cập nhật `docs/progress.md`.
+
+**GĐ 5b · Ảnh tại quán +50 điểm** — người dùng có chuyến dùng mã của quán chụp ảnh tại quán (máy ảnh + vị trí), ảnh vào kho riêng tư `checkin-photos`; máy chủ kiểm: chuyến của chính người đó, trong 24 giờ sau chuyến, vị trí lúc chụp cách quán ≤ 150 m, mỗi chuyến một ảnh, mã băm ảnh không trùng ảnh cũ; ảnh vào hàng chờ duyệt ở web quản trị, duyệt thì cộng 50 điểm (ghi sổ điểm), từ chối có lý do. Quán tài trợ chỉ thấy số lượt check-in, không thấy ảnh hay người chụp.
+
+## Chưa làm trong đợt này
+- Tự điền mã sau khi cài app từ link (deferred deep link).

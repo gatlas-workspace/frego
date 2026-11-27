@@ -1,4 +1,5 @@
 import { View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { Shimmer } from '@/components/motion';
 import { Button, InfoNote } from '@/components/ui';
 import { colors, radius } from '@/theme/tokens';
 
@@ -14,13 +15,7 @@ export function Skeleton({
   r?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={[{ height, width, borderRadius: r, backgroundColor: colors.skeleton }, style]}
-    />
-  );
+  return <Shimmer style={[{ height, width, borderRadius: r, backgroundColor: colors.skeleton }, style]} />;
 }
 
 /** Vùng đang tải: vài khối xám, đọc là "Đang tải". */

@@ -1,4 +1,4 @@
-// 5 · Ví voucher (thiết kế ViVoucher-v2.dc.html): tab Tặng bạn / Tại quán / Mã công khai / Đã dùng, mở sẵn Mã công khai.
+// 3a · Ví voucher (thiết kế UI v3: V3-ViVoucher.dc.html, Ví lần đầu V3-ViTrong.dc.html): tab Tặng bạn / Tại quán / Công khai / Đã dùng.
 // Tại quán (27/11/2026): ưu đãi trên banner quán tài trợ đã xem trong ngày, mở lại để đưa nhân viên.
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Linking, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PROVIDER_ORDER, PROVIDERS, type ShopOfferView, type WalletView } from '@frego/core';
-import { Button, Card, CodeCard, ListCard, ListRow, Pill, T, Tabs, VoucherTicket, type TabItem } from '@/components/ui';
+import { Button, Card, CodeCard, EmptyState, ListCard, ListRow, Pill, T, UnderlineTabs, VoucherTicket } from '@/components/ui';
+import { Rise } from '@/components/motion';
 import { BannerImage } from '@/components/screens/flow/BannerImage';
 import { EmptyCard, ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
 import { TextLink } from '@/components/screens/wallet/TextLink';
@@ -16,23 +17,25 @@ import { colors, layout } from '@/theme/tokens';
 
 type WalletTab = 'gift' | 'shop' | 'public' | 'used';
 
-const TABS: TabItem<WalletTab>[] = [
-  { key: 'gift', label: 'Tặng bạn' },
-  { key: 'shop', label: 'Tại quán' },
-  { key: 'public', label: 'Mã công khai' },
-  { key: 'used', label: 'Đã dùng' },
-];
 
 const isTab = (v: unknown): v is WalletTab => v === 'gift' || v === 'shop' || v === 'public' || v === 'used';
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
-  const { svc } = useApi();
+  const { svc, status } = useApi();
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<WalletTab>(isTab(params.tab) ? params.tab : 'public');
   const [fit, setFit] = useState(false);
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: () => svc.getWallet() });
-  const shop = useQuery({ queryKey: ['shopOffers'], queryFn: () => svc.shopOffers(), enabled: tab === 'shop' });
+  const shop = useQuery({ queryKey: ['shopOffers'], queryFn: () => svc.shopOffers() });
+  const me = useQuery({ queryKey: ['me'], queryFn: () => svc.getMe(), enabled: status === 'signedIn' });
+  const w = wallet.data;
+  const tabs = [
+    { key: 'gift' as const, label: 'Tặng bạn', count: w?.gifts.length },
+    { key: 'shop' as const, label: 'Tại quán', count: shop.data?.length },
+    { key: 'public' as const, label: 'Công khai', count: w ? w.publicCodes.length : undefined },
+    { key: 'used' as const, label: 'Đã dùng' },
+  ];
   useGiftPush();
 
   // Mở Ví từ nơi khác với ?tab=gift (VD sau khi đổi điểm) → chuyển đúng tab.
@@ -41,24 +44,24 @@ export default function WalletScreen() {
   }, [params.tab]);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{
-        paddingTop: Math.max(insets.top + 12, layout.topInset),
-        paddingHorizontal: layout.gutter,
-        paddingBottom: 24,
-        gap: 16,
-      }}
-    >
-      <View style={{ gap: 6 }}>
-        <T variant="tabTitle" accessibilityRole="header" style={{ letterSpacing: -0.5 }}>
-          Ví voucher
-        </T>
-        <T size={14} lineHeight={21} color={colors.ink2}>
-          Mã nhãn hàng tặng riêng bạn và mã công khai Frego tổng hợp, luôn kèm nguồn.
-        </T>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ paddingTop: Math.max(insets.top + 12, layout.topInset), paddingHorizontal: layout.gutter, gap: 14, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+          <T variant="tabTitle" accessibilityRole="header" style={{ letterSpacing: -0.4 }}>
+            Ví voucher
+          </T>
+          {me.data ? (
+            <T size={13} lineHeight={18} color={colors.ink2} style={{ marginBottom: 4 }}>
+              Đã tiết kiệm{' '}
+              <T weight={800} size={13} lineHeight={18}>
+                {me.data.savedText}
+              </T>
+            </T>
+          ) : null}
+        </View>
+        <UnderlineTabs items={tabs} value={tab} onChange={setTab} accessibilityLabel="Loại voucher" />
       </View>
-      <Tabs items={TABS} value={tab} onChange={setTab} accessibilityLabel="Loại mã" />
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 24, gap: 12 }}>
       {wallet.isPending ? (
         <LoadingState label="Đang tải Ví voucher" />
       ) : wallet.isError ? (
@@ -66,7 +69,7 @@ export default function WalletScreen() {
       ) : tab === 'public' ? (
         <PublicTab data={wallet.data} fit={fit} onToggleFit={() => setFit((v) => !v)} />
       ) : tab === 'gift' ? (
-        <GiftTab data={wallet.data} />
+        <GiftTab data={wallet.data} onPublic={() => setTab('public')} />
       ) : tab === 'shop' ? (
         shop.isPending ? (
           <LoadingState label="Đang tải ưu đãi tại quán" />
@@ -79,6 +82,7 @@ export default function WalletScreen() {
         <UsedTab data={wallet.data} />
       )}
     </ScrollView>
+    </View>
   );
 }
 
@@ -119,7 +123,7 @@ function PublicTab({ data, fit, onToggleFit }: { data: WalletView; fit: boolean;
   );
 }
 
-function GiftTab({ data }: { data: WalletView }) {
+function GiftTab({ data, onPublic }: { data: WalletView; onPublic: () => void }) {
   return (
     <View style={{ gap: 12 }}>
       <T size={14} lineHeight={21} color={colors.ink2}>
@@ -127,12 +131,21 @@ function GiftTab({ data }: { data: WalletView }) {
       </T>
       {data.gifts.length ? (
         <View accessibilityRole="list" style={{ gap: 12 }}>
-          {data.gifts.map((g) => (
-            <VoucherTicket key={g.id} {...g} lineIcon="spark" onPress={() => router.push(g.link)} />
+          {data.gifts.map((g, i) => (
+            <Rise key={g.id} index={i}>
+              <VoucherTicket {...g} lineIcon="spark" onPress={() => router.push(g.link)} />
+            </Rise>
           ))}
         </View>
       ) : (
-        <EmptyCard text="Chưa có voucher tặng riêng. Khi nơi bạn hay đến nằm gần quán tài trợ, mã sẽ hiện ở đây." />
+        <EmptyState title="Chưa có voucher tặng riêng" text="Khi nơi bạn hay đến nằm gần quán tài trợ, mã sẽ hiện ở đây. Trong lúc chờ, bạn vẫn có thể:">
+          <ListCard accessibilityLabel="Gợi ý">
+            <ListRow icon="ticket" title={`Xem ${data.publicCodes.length} mã công khai`} sub="Mã ngân hàng, ví đang chạy, có ghi nguồn" onPress={onPublic} />
+            <ListRow icon="link" title="Liên kết thẻ, ví" sub="Frego tự gắn mã hợp thẻ của bạn khi so giá" onPress={() => router.push('/lien-ket')} />
+            <ListRow icon="gift" title="Mời bạn bè" sub="Bạn +200 điểm khi bạn ấy báo giá chuyến đầu" onPress={() => router.push('/gioi-thieu')} />
+          </ListCard>
+          <Button label="So giá chuyến đầu tiên" onPress={() => router.push('/tim-kiem')} />
+        </EmptyState>
       )}
       <TextLink
         label="Quản lý dữ liệu dùng để tặng mã"

@@ -4,9 +4,9 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Platform, RefreshControl, ScrollView, Share, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { brand, type IconName, type MeView } from '@frego/core';
+import { brand, POINTS_RULES, type IconName, type MeView } from '@frego/core';
 import { Button, InfoNote, ListCard, ListRow, ModalSheet, T } from '@/components/ui';
-import { GuestPrompt, ProfileCard, StatCards } from '@/components/screens/account/AccountSummary';
+import { GuestPrompt, ProfileCard, ReferralCard, StatCards } from '@/components/screens/account/AccountSummary';
 import { usePullRefresh } from '@/components/screens/account/usePullRefresh';
 import { ErrorView, LoadingView } from '@/components/screens/account/ScreenState';
 import { useApi } from '@/lib/api';
@@ -135,6 +135,11 @@ export default function TaiKhoanScreen() {
             savedText={data.savedText}
             savedSub={data.savedSub}
             onPoints={() => router.push('/diem-thuong')}
+          />
+          <ReferralCard
+            referrer={POINTS_RULES.referral.referrer}
+            referee={POINTS_RULES.referral.referee}
+            onPress={() => router.push('/gioi-thieu')}
           />
         </>
       ) : me.isError ? (

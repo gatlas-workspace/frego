@@ -138,6 +138,7 @@ const DEAL: DealView = {
   category: 'tea',
   area: 'Gần chợ Tân Định',
   brand: 'Tiệm trà Sen',
+  endsInText: 'Còn 5 ngày',
   serviceText: 'Mã Be xe máy',
   amountText: '−10.000đ',
   cta: 'Đặt xe ›',

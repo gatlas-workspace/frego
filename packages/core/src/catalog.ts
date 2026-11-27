@@ -1,4 +1,5 @@
 /** Danh mục cố định: hãng xe, loại xe, tên dịch vụ, nhãn hiển thị. */
+import { brand } from './brand';
 import type { CategoryKey, Provider, ProviderId, Service, ServiceKey, VehicleClass } from './types';
 
 export const PROVIDERS: Record<ProviderId, Provider> = {
@@ -133,4 +134,34 @@ export const POINTS_RULES = {
   dailyCap: 300,
   /** Số tiền nhập lệch quá 30% so với khoảng ước tính thì không cộng điểm. */
   maxDeviation: 0.3,
+  /**
+   * Giới thiệu bạn bè: người giới thiệu +200, người mới +100 khi người mới báo giá được cộng điểm lần đầu trong
+   * `qualifyDays` ngày kể từ lúc nhập mã. Nhập mã trong `enterDays` ngày đầu sau khi tạo tài khoản. Tối đa
+   * `monthlyCap` lượt được thưởng mỗi người giới thiệu mỗi tháng (giờ VN), vượt thì giữ để kiểm tra.
+   * Điểm giới thiệu không tính vào giới hạn 300 điểm báo giá/ngày.
+   */
+  referral: { referrer: 200, referee: 100, enterDays: 7, qualifyDays: 30, monthlyCap: 10 },
+  /** Ảnh chụp tại quán tài trợ sau chuyến dùng mã của quán, cộng khi Frego duyệt. */
+  shopPhoto: 50,
+} as const;
+
+/** Điều kiện nhận ảnh tại quán (máy chủ kiểm, SQL submit_shop_photo dùng cùng số). */
+export const SHOP_PHOTO_RULES = {
+  /** Vị trí lúc chụp cách quán tối đa (m) */
+  maxDistanceM: 150,
+  /** Chụp trong số giờ này sau khi tạo chuyến */
+  windowHours: 24,
+} as const;
+
+/** Ảnh bìa Trang chủ (QT 13): kích thước, dung lượng, lớp phủ cho phép. */
+export const HOME_COVER_RULES = {
+  width: 1170,
+  height: 630,
+  maxBytes: 500 * 1024,
+  types: ['image/jpeg', 'image/png', 'image/webp'] as readonly string[],
+  overlays: [0, 0.2, 0.4, 0.6] as readonly number[],
+  /** Màu lớp phủ tối (brand.colors.coverOverlay) */
+  overlayColor: brand.colors.coverOverlay,
+  /** Tương phản tối thiểu của chữ trắng trên ảnh */
+  minContrast: 4.5,
 } as const;

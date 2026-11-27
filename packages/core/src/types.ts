@@ -111,6 +111,11 @@ export interface Profile {
   lockReason: string | null;
   createdAt: ISODate;
   onboardedAt: ISODate | null;
+  /**
+   * Mã giới thiệu riêng (6–7 ký tự in hoa, duy nhất), sinh khi tạo hồ sơ. Supabase: cột not null (trigger sinh mã).
+   * Tùy chọn ở kiểu để dữ liệu DEMO cũ / hồ sơ tạo tay vẫn hợp lệ (DEMO tự sinh khi thiếu).
+   */
+  referralCode?: string;
 }
 
 export interface Consents {
@@ -545,5 +550,68 @@ export interface Broadcast {
   scheduledAt: ISODate;
   status: 'draft' | 'scheduled' | 'sent';
   recipients: number;
+  createdAt: ISODate;
+}
+
+/* ───────────────────────── Giới thiệu bạn bè, ảnh bìa, ảnh tại quán (UI v3) ───────────────────────── */
+
+export type ReferralStatus = 'pending' | 'rewarded' | 'held' | 'expired' | 'rejected';
+
+/** Một lượt giới thiệu: người mới (referee) nhập mã của người giới thiệu (referrer). Mỗi người mới một lượt. */
+export interface Referral {
+  id: string;
+  referrerId: string;
+  refereeId: string;
+  status: ReferralStatus;
+  /** Lúc nhập mã */
+  createdAt: ISODate;
+  /** Lúc người mới báo giá được cộng điểm lần đầu (đạt điều kiện) */
+  qualifiedAt: ISODate | null;
+  rewardedAt: ISODate | null;
+  /** Lý do giữ / từ chối / hết hạn */
+  note: string | null;
+}
+
+/** Ảnh bìa Trang chủ app (QT 13). Mỗi lúc hiện một ảnh "scheduled" có khung giờ chứa hiện tại. */
+export interface AppBanner {
+  id: string;
+  /** Tên ảnh, chỉ hiện trong quản trị */
+  title: string;
+  /** URL công khai (bucket app-banners; DEMO: data URL) */
+  imageUrl: string;
+  /** Đường dẫn trong bucket app-banners (để gỡ tệp); DEMO: "demo/<tên tệp>" */
+  storagePath: string | null;
+  startsAt: ISODate;
+  endsAt: ISODate;
+  /** Lớp phủ tối #14152B: 0 | 0.2 | 0.4 | 0.6 */
+  overlay: number;
+  status: 'draft' | 'scheduled';
+  /** Quản trị viên tạo / sửa lần cuối (profiles.id) */
+  createdBy: string | null;
+  updatedAt: ISODate;
+}
+
+export type ShopPhotoStatus = 'pending' | 'approved' | 'rejected';
+
+/** Ảnh chụp tại quán tài trợ sau chuyến dùng mã của quán (+50 điểm khi Frego duyệt). Quán không thấy ảnh, người chụp. */
+export interface ShopPhoto {
+  id: string;
+  userId: string;
+  tripId: string;
+  businessId: string;
+  /** Đường dẫn trong bucket riêng checkin-photos: "<userId>/<tệp>" */
+  storagePath: string;
+  /** SHA-256 (hex) của tệp ảnh: không nhận lại ảnh cũ */
+  sha256: string;
+  takenAt: ISODate;
+  lat: number;
+  lng: number;
+  /** Khoảng cách từ chỗ chụp tới quán (m) */
+  distanceM: number;
+  status: ShopPhotoStatus;
+  rejectReason: string | null;
+  /** Tên người duyệt */
+  reviewedBy: string | null;
+  reviewedAt: ISODate | null;
   createdAt: ISODate;
 }

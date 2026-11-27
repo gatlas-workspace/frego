@@ -34,12 +34,14 @@ const DESIGN_ICON: Record<string, AnyIconName> = {
   banggia: 'chart',
   doitac: 'link',
   hotro: 'info',
+  anhtaiquan: 'camera',
+  anhbia: 'home',
 };
 
 /** Nhóm của trang quản trị theo thiết kế: Vận hành · Người dùng · Dữ liệu · Hệ thống (nhãn, href lấy từ ADMIN_NAV). */
 const ADMIN_GROUPS: { group: string; keys: AdminNavKey[] }[] = [
   { group: 'Vận hành', keys: ['tongquan', 'duyet', 'doanhnghiep', 'chiendich', 'tien'] },
-  { group: 'Người dùng', keys: ['nguoidung', 'diem', 'thongbao'] },
+  { group: 'Người dùng', keys: ['nguoidung', 'diem', 'anhtaiquan', 'thongbao', 'anhbia'] },
   { group: 'Dữ liệu', keys: ['khoma', 'banggia', 'doitac'] },
   { group: 'Hệ thống', keys: ['hotro'] },
 ];

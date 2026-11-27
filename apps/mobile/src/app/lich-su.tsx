@@ -7,6 +7,7 @@ import type { TripHistoryItem } from '@frego/core';
 import { ScreenHeader, SectionTitle, Tabs, type TabItem } from '@/components/ui';
 import { EmptyCard, ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
 import { TripCard } from '@/components/screens/wallet/TripCard';
+import { Rise } from '@/components/motion';
 import { useApi } from '@/lib/api';
 import { colors, layout } from '@/theme/tokens';
 
@@ -64,13 +65,13 @@ export default function HistoryScreen() {
               }
             />
           ) : (
-            groups.map((g) => (
-              <View key={g.label} style={{ gap: 10 }}>
+            groups.map((g, gi) => (
+              <Rise key={g.label} index={gi} style={{ gap: 10 }}>
                 <SectionTitle text={g.label} size="sm" />
                 {g.items.map((t) => (
                   <TripCard key={t.id} trip={t} onReport={() => router.push(`/bao-gia/${t.id}`)} />
                 ))}
-              </View>
+              </Rise>
             ))
           )}
         </ScrollView>

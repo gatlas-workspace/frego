@@ -4,12 +4,14 @@
  */
 import { brand } from '../brand';
 import { PROVIDERS, SERVICES, parseServiceKey, serviceShortLabel } from '../catalog';
-import { formatDiscount, formatNumber, formatVnd } from '../format';
-import { POINTS_RULES } from '../catalog';
+import { formatDiscount, formatNumber, formatVnd, maskName, vnParts } from '../format';
+import { POINTS_RULES, SHOP_PHOTO_RULES } from '../catalog';
+import { distanceM } from '../geo';
 import { DEMO_NOW } from '../seed/base';
 import type { Db, FileStore, ListOptions, RpcName, Rpcs } from './types';
 import { PRIMARY_KEYS, type BaseTableName, type Row, type Seed, type TableName } from './schema';
-import type { AppNotification, Trip, UserVoucher } from '../types';
+import type { AppNotification, Profile, Referral, ReferralStatus, ShopPhoto, Trip, UserVoucher } from '../types';
+import type { ReferralCheckReason } from './types';
 
 /** Biên nhận khớp chuyến mở app hãng trong 3 giờ trước đó (SQL: interval '3 hours'). */
 export const RECEIPT_MATCH_WINDOW_MS = 3 * 3600_000;
@@ -38,6 +40,33 @@ export function stripDiacritics(s: string): string {
     .replace(/[̀-ͯ]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D');
+}
+
+/**
+ * Mã giới thiệu: chữ đầu tên (tối đa 4 chữ của từ đầu + chữ đầu của từ cuối, không dấu) + ký tự ngẫu nhiên (bỏ 0/O/1/I),
+ * tổng 6–7 ký tự: "Minh Anh" → "MINHA7K", "Lan" → "LAN7QX". Trùng thì thử lại (SQL: public._gen_referral_code).
+ */
+export function genReferralCode(name: string, taken: (code: string) => boolean): string {
+  const words = stripDiacritics(name)
+    .toUpperCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^A-Z]/g, ''))
+    .filter(Boolean);
+  const full = words.length ? (words[0].slice(0, 4) + (words.length > 1 ? words[words.length - 1][0] : '')).slice(0, 5) : 'FRE';
+  for (let i = 0; i < 40; i++) {
+    // Sau 10 lần trùng: rút tiền tố còn 4 chữ để có thêm ký tự ngẫu nhiên (vẫn ≤ 7 ký tự).
+    const prefix = i < 10 ? full : full.slice(0, 4);
+    const n = i < 10 ? Math.max(2, 6 - prefix.length) : 7 - prefix.length;
+    let code = prefix;
+    for (let k = 0; k < n; k++) code += ALNUM[Math.floor(Math.random() * ALNUM.length)];
+    if (!taken(code)) return code;
+  }
+  throw new Error('Không tạo được mã giới thiệu');
+}
+
+/** Chuẩn hóa mã người dùng gõ: in hoa, bỏ khoảng trắng / ký tự lạ. */
+export function normalizeReferralCode(code: string): string {
+  return String(code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 function codePrefix(name: string): string {
@@ -69,6 +98,12 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
   const startAt = new Date(opts.startAt ?? DEMO_NOW).getTime();
   const now = () => new Date(startAt + (Date.now() - bootReal));
   const changed = () => opts.onChange?.(data);
+  // Bảng thêm sau (dữ liệu DEMO cũ đã lưu có thể thiếu) + mã giới thiệu cho hồ sơ cũ (như phần điền mã trong migration).
+  data.referrals ??= [];
+  data.app_banners ??= [];
+  data.shop_photos ??= [];
+  const codeTaken = (c: string) => data.profiles.some((p) => p.referralCode === c);
+  for (const p of data.profiles) if (!p.referralCode) p.referralCode = genReferralCode(p.displayName, codeTaken);
 
   const pk = <T extends TableName>(t: T) => PRIMARY_KEYS[t] as keyof Row<T>;
 
@@ -193,6 +228,11 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       const key = pk(table);
       const full = { ...row } as Row<T>;
       if (!full[key]) (full as unknown as Record<string, unknown>)[key as string] = uid();
+      // Như trigger SQL profiles_referral_code: hồ sơ mới tự có mã giới thiệu.
+      if (table === 'profiles') {
+        const p = full as unknown as Profile;
+        if (!p.referralCode) p.referralCode = genReferralCode(p.displayName ?? '', codeTaken);
+      }
       base(table).push(full);
       changed();
       return clone(full);
@@ -202,6 +242,16 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       if (isView(table)) throw new Error(`${table} là view chỉ đọc`);
       const r = find(table, id);
       if (!r) throw new Error(`Không tìm thấy ${table}/${id}`);
+      // Như trigger SQL profiles_referral_code_rename: mã sinh lúc chưa có tên ("FRE…") đổi theo tên đầu tiên,
+      // khi chưa ai nhập mã này.
+      if (table === 'profiles') {
+        const p = r as unknown as Profile;
+        const name = (patch as Partial<Profile>).displayName;
+        const setsCode = (patch as Partial<Profile>).referralCode !== undefined;
+        if (name && !p.displayName && !setsCode && !data.referrals.some((x) => x.referrerId === p.id)) {
+          p.referralCode = genReferralCode(name, codeTaken);
+        }
+      }
       Object.assign(r, patch);
       changed();
       return clone(r);
@@ -248,6 +298,118 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
     if (!t || t.userId !== u) throw new Error('Không tìm thấy chuyến');
     return t;
   };
+
+  /* ───── Giới thiệu bạn bè (SQL: _referral_check, _referral_qualify, _referral_reward) ───── */
+
+  const DAY_MS = 86_400_000;
+  const R = POINTS_RULES.referral;
+  const monthOf = (iso: string | Date) => {
+    const p = vnParts(iso);
+    return p.year * 12 + p.month;
+  };
+  /** Khách: tài khoản ẩn danh, chưa có số điện thoại (SQL: auth.jwt() is_anonymous). */
+  const isGuest = (u: string) => !profile(u).phone;
+  const nameOf = (id: string) => maskName(find('profiles', id)?.displayName ?? '');
+
+  const REFERRAL_MSG: Record<ReferralCheckReason | 'newer', string> = {
+    guest: 'Đăng nhập bằng số điện thoại để nhập mã giới thiệu.',
+    already: 'Bạn đã nhập mã giới thiệu rồi. Mỗi tài khoản chỉ nhập được một mã.',
+    too_late: `Chỉ nhập được mã trong ${R.enterDays} ngày đầu sau khi tạo tài khoản.`,
+    not_found: 'Không tìm thấy mã này. Kiểm tra lại chữ và số.',
+    own: 'Đây là mã của bạn. Hãy nhập mã của bạn bè.',
+    newer: 'Mã này của tài khoản tạo sau bạn nên không áp dụng được.',
+  };
+
+  /** Kiểm tra mã theo thứ tự: khách → đã nhập → quá hạn → không có mã → mã của mình → chủ mã tạo sau. */
+  const referralCheck = (u: string, raw: string): { owner: Profile } | { reason: ReferralCheckReason | 'newer' } => {
+    const me = profile(u);
+    if (isGuest(u)) return { reason: 'guest' };
+    if (data.referrals.some((r) => r.refereeId === u)) return { reason: 'already' };
+    if (now().getTime() - new Date(me.createdAt).getTime() > R.enterDays * DAY_MS) return { reason: 'too_late' };
+    const code = normalizeReferralCode(raw);
+    const owner = code ? data.profiles.find((p) => p.referralCode === code) : undefined;
+    if (!owner) return { reason: 'not_found' };
+    if (owner.id === u) return { reason: 'own' };
+    if (new Date(owner.createdAt).getTime() > new Date(me.createdAt).getTime()) return { reason: 'newer' };
+    return { owner };
+  };
+
+  /** Cộng thưởng cho cả hai bên, đánh dấu rewarded, báo người giới thiệu. */
+  const referralReward = (r: Referral) => {
+    const t = now().toISOString();
+    ledger(r.refereeId, R.referee, `Nhập mã giới thiệu của ${nameOf(r.referrerId)}`, null);
+    ledger(r.referrerId, R.referrer, `Giới thiệu bạn bè: ${nameOf(r.refereeId)}`, null);
+    r.status = 'rewarded';
+    r.rewardedAt = t;
+    r.qualifiedAt ??= t;
+    r.note = null;
+    if (prefsOf(r.referrerId)?.points !== false) {
+      pushNotification({
+        userId: r.referrerId,
+        category: 'trip',
+        kind: 'points',
+        icon: 'sparkplus',
+        tone: 'tint',
+        logo: 'frego',
+        title: `${nameOf(r.refereeId)} vừa hoàn tất chuyến đầu, bạn được +${R.referrer} điểm`,
+        body: 'Cảm ơn bạn đã giới thiệu Frego. Điểm dùng để đổi voucher ở mục Điểm thưởng.',
+        cta: 'Xem bạn bè ›',
+        link: '/gioi-thieu',
+      });
+    }
+  };
+
+  /** Hết hạn lượt chờ quá 30 ngày kể từ lúc nhập mã (tính lúc đọc). */
+  const referralExpire = (r: Referral) => {
+    if (r.status === 'pending' && now().getTime() - new Date(r.createdAt).getTime() > R.qualifyDays * DAY_MS) {
+      r.status = 'expired';
+      r.note = `Quá ${R.qualifyDays} ngày chưa có chuyến đầu`;
+    }
+  };
+
+  /** Gọi khi người dùng vừa được cộng điểm báo giá: lần đầu sau khi nhập mã → thưởng / giữ lại. */
+  const referralQualify = (u: string) => {
+    const r = data.referrals.find((x) => x.refereeId === u && x.status === 'pending');
+    if (!r) return;
+    referralExpire(r);
+    if (r.status !== 'pending') return;
+    const t = now().toISOString();
+    r.qualifiedAt = t;
+    const referrer = profile(r.referrerId);
+    const monthCount = data.referrals.filter(
+      (x) => x.referrerId === r.referrerId && x.status === 'rewarded' && !!x.rewardedAt && monthOf(x.rewardedAt) === monthOf(t),
+    ).length;
+    if (referrer.status === 'locked' || profile(u).status === 'locked') {
+      r.status = 'held';
+      r.note = referrer.status === 'locked' ? 'Tài khoản người giới thiệu đang tạm khóa' : 'Tài khoản người mới đang tạm khóa';
+    } else if (monthCount >= R.monthlyCap) {
+      r.status = 'held';
+      r.note = `Người giới thiệu đã đạt ${R.monthlyCap} lượt thưởng trong tháng`;
+    } else {
+      referralReward(r);
+    }
+  };
+
+  /* ───── Ảnh tại quán (SQL: _trip_sponsor_shop) ───── */
+
+  /** Quán tài trợ của chuyến: mã của quán đã gắn (ưu tiên hãng đã chọn), "uv:" → chiến dịch của voucher, "cp:" → chiến dịch. */
+  const tripSponsorShop = (trip: Trip) => {
+    const codes = trip.attached
+      .filter((c) => c.source === 'sponsor')
+      .sort((a, b) => Number(b.service === trip.chosenService) - Number(a.service === trip.chosenService));
+    for (const code of codes) {
+      const campaignId = code.refId.startsWith('uv:')
+        ? (data.user_vouchers.find((v) => v.id === code.refId.slice(3) && v.userId === trip.userId)?.campaignId ?? null)
+        : code.refId.startsWith('cp:')
+          ? code.refId.slice(3)
+          : null;
+      const camp = campaignId ? find('campaigns', campaignId) : null;
+      const biz = camp ? find('businesses', camp.businessId) : null;
+      if (biz) return biz;
+    }
+    return null;
+  };
+  const actorName = () => (userId ? find('profiles', userId)?.displayName : '') || 'Vận hành Frego';
 
   const rpcs: { [N in RpcName]: (a: Rpcs[N]['args']) => Rpcs[N]['result'] } = {
     record_trip(a) {
@@ -458,6 +620,8 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         trip.reportedAt = t;
         trip.pointsAwarded += awarded;
       }
+      // Giới thiệu bạn bè: lần báo giá được cộng điểm đầu tiên sau khi nhập mã (điểm giới thiệu không tính vào giới hạn ngày).
+      if (awarded > 0) referralQualify(u);
       return { trip, pointsAwarded: awarded, points: profile(u).points, held };
     },
 
@@ -475,6 +639,9 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         }
       }
       data.profiles = data.profiles.filter((p) => p.id !== u);
+      // referrals: "on delete cascade" từ cả hai phía; app_banners.created_by: "on delete set null".
+      data.referrals = data.referrals.filter((r) => r.referrerId !== u && r.refereeId !== u);
+      for (const b of data.app_banners) if (b.createdBy === u) b.createdBy = null;
       userId = null;
       return { deleted: true as const };
     },
@@ -798,6 +965,7 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         trip.status = 'reported';
         trip.reportedAt = t;
         trip.pointsAwarded += awarded;
+        if (awarded > 0) referralQualify(u);
       } else if (candidates[0]) {
         status = 'already_reported';
         tripId = candidates[0].id;
@@ -821,6 +989,194 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
         createdAt: t,
       });
       return { status, duplicate: false, tripId, pointsAwarded: awarded, held };
+    },
+
+    /* ───── Giới thiệu bạn bè — giống SQL trong supabase/migrations/20261127001200_v3_referral_cover_photo.sql ───── */
+
+    check_referral_code({ code }) {
+      const u = requireUser();
+      const r = referralCheck(u, code);
+      if ('owner' in r) return { ok: true as const, ownerName: maskName(r.owner.displayName) };
+      return {
+        ok: false as const,
+        reason: r.reason === 'newer' ? ('not_found' as const) : r.reason,
+        message: REFERRAL_MSG[r.reason],
+      };
+    },
+
+    apply_referral_code({ code }) {
+      const u = requireUser();
+      const r = referralCheck(u, code);
+      if (!('owner' in r)) throw new Error(REFERRAL_MSG[r.reason]);
+      data.referrals.push({
+        id: uid(),
+        referrerId: r.owner.id,
+        refereeId: u,
+        status: 'pending',
+        createdAt: now().toISOString(),
+        qualifiedAt: null,
+        rewardedAt: null,
+        note: null,
+      });
+      return { ownerName: maskName(r.owner.displayName) };
+    },
+
+    my_referrals() {
+      const u = requireUser();
+      const me = profile(u);
+      if (!me.referralCode) me.referralCode = genReferralCode(me.displayName, codeTaken);
+      const mine = data.referrals.filter((r) => r.referrerId === u || r.refereeId === u);
+      mine.forEach(referralExpire);
+      const t = now();
+      const friends = mine
+        .filter((r) => r.referrerId === u)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .map((r) => ({
+          id: r.id,
+          name: nameOf(r.refereeId),
+          status: r.status,
+          createdAt: r.createdAt,
+          qualifiedAt: r.qualifiedAt,
+          rewardedAt: r.rewardedAt,
+        }));
+      const entered = mine.find((r) => r.refereeId === u) ?? null;
+      return {
+        code: me.referralCode,
+        accountCreatedAt: me.createdAt,
+        guest: isGuest(u),
+        monthRewarded: friends.filter((f) => f.status === 'rewarded' && f.rewardedAt && monthOf(f.rewardedAt) === monthOf(t)).length,
+        friends,
+        enteredBy: entered ? { name: nameOf(entered.referrerId), status: entered.status, createdAt: entered.createdAt } : null,
+      };
+    },
+
+    referral_owner_name({ code }) {
+      const c = normalizeReferralCode(code);
+      const owner = c ? data.profiles.find((p) => p.referralCode === c) : undefined;
+      return { ownerName: owner ? maskName(owner.displayName) : null };
+    },
+
+    admin_set_referral_status({ id, status, note }) {
+      const r = find('referrals', id);
+      if (!r) throw new Error('Không tìm thấy lượt giới thiệu');
+      if (!(['rewarded', 'rejected', 'held'] as ReferralStatus[]).includes(status)) throw new Error('Trạng thái không hợp lệ');
+      if (r.status === 'rewarded') throw new Error('Lượt này đã cộng điểm, không đổi được');
+      if (status === 'rewarded') {
+        referralReward(r);
+      } else {
+        r.status = status;
+        r.note = note?.trim() || (status === 'rejected' ? 'Frego từ chối sau khi kiểm tra' : r.note);
+      }
+      data.audit_logs.push({
+        id: uid(),
+        actorName: 'Vận hành Frego',
+        actorRole: 'ops',
+        action: `${status === 'rewarded' ? 'Duyệt thưởng' : status === 'rejected' ? 'Từ chối' : 'Giữ lại'} lượt giới thiệu ${nameOf(r.referrerId)} → ${nameOf(r.refereeId)}${note?.trim() ? `, ghi chú ${note.trim()}` : ''}`,
+        createdAt: now().toISOString(),
+      });
+      return r;
+    },
+
+    /* ───── Ảnh bìa Trang chủ ───── */
+
+    active_home_cover() {
+      const t = now().getTime();
+      const cur = data.app_banners
+        .filter((b) => b.status === 'scheduled' && new Date(b.startsAt).getTime() <= t && new Date(b.endsAt).getTime() > t)
+        .sort((a, b) => (a.startsAt < b.startsAt ? 1 : -1))[0];
+      return cur ? { imageUrl: cur.imageUrl, overlay: cur.overlay, title: cur.title } : null;
+    },
+
+    /* ───── Ảnh tại quán ───── */
+
+    submit_shop_photo(a) {
+      const u = requireUser();
+      if (isGuest(u)) throw new Error('Đăng nhập bằng số điện thoại để gửi ảnh tại quán');
+      if (profile(u).status === 'locked') throw new Error('Tài khoản đang tạm khóa');
+      const trip = tripOf(a.tripId, u);
+      const biz = tripSponsorShop(trip);
+      if (!biz) throw new Error('Chuyến này không dùng mã của quán tài trợ');
+      if (data.shop_photos.some((p) => p.tripId === trip.id)) throw new Error('Chuyến này đã gửi ảnh tại quán rồi');
+      const sha = String(a.sha256 ?? '').toLowerCase();
+      if (!/^[0-9a-f]{64}$/.test(sha)) throw new Error('Ảnh không hợp lệ');
+      if (data.shop_photos.some((p) => p.sha256 === sha)) throw new Error('Ảnh này đã được gửi trước đây. Hãy chụp ảnh mới tại quán');
+      if (!String(a.storagePath ?? '').startsWith(`${u}/`)) throw new Error('Ảnh không hợp lệ');
+      const taken = new Date(a.takenAt).getTime();
+      if (Number.isNaN(taken)) throw new Error('Giờ chụp không hợp lệ');
+      if (taken > now().getTime() + 5 * 60_000) throw new Error('Giờ chụp không hợp lệ');
+      const created = new Date(trip.createdAt).getTime();
+      if (taken < created || taken > created + SHOP_PHOTO_RULES.windowHours * 3600_000) {
+        throw new Error(`Ảnh phải chụp trong ${SHOP_PHOTO_RULES.windowHours} giờ sau chuyến đi`);
+      }
+      const lat = Number(a.lat);
+      const lng = Number(a.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        throw new Error('Chưa có vị trí lúc chụp');
+      }
+      const d = Math.round(distanceM({ lat, lng }, biz));
+      if (d > SHOP_PHOTO_RULES.maxDistanceM) {
+        throw new Error(`Vị trí chụp cách quán ${d} m, cần ở trong vòng ${SHOP_PHOTO_RULES.maxDistanceM} m quanh quán`);
+      }
+      const row: ShopPhoto = {
+        id: uid(),
+        userId: u,
+        tripId: trip.id,
+        businessId: biz.id,
+        storagePath: a.storagePath,
+        sha256: sha,
+        takenAt: new Date(taken).toISOString(),
+        lat,
+        lng,
+        distanceM: d,
+        status: 'pending',
+        rejectReason: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        createdAt: now().toISOString(),
+      };
+      data.shop_photos.push(row);
+      return row;
+    },
+
+    business_checkin_count({ businessId }) {
+      return { count: data.shop_photos.filter((p) => p.businessId === businessId && p.status === 'approved').length };
+    },
+
+    review_shop_photo({ id, approve, reason }) {
+      const photo = find('shop_photos', id);
+      if (!photo) throw new Error('Không tìm thấy ảnh');
+      if (photo.status !== 'pending') throw new Error('Ảnh này đã được xử lý');
+      const why = (reason ?? '').trim();
+      if (!approve && !why) throw new Error('Nhập lý do từ chối');
+      const shop = find('businesses', photo.businessId)?.name ?? 'quán';
+      const t = now().toISOString();
+      photo.status = approve ? 'approved' : 'rejected';
+      photo.rejectReason = approve ? null : why;
+      photo.reviewedBy = actorName();
+      photo.reviewedAt = t;
+      if (approve) ledger(photo.userId, POINTS_RULES.shopPhoto, `Ảnh tại quán ${shop}`, null);
+      if (prefsOf(photo.userId)?.points !== false) {
+        pushNotification({
+          userId: photo.userId,
+          category: 'trip',
+          kind: 'points',
+          icon: approve ? 'sparkplus' : 'camera',
+          tone: 'tint',
+          logo: 'frego',
+          title: approve ? `Ảnh tại ${shop} đã được duyệt, +${POINTS_RULES.shopPhoto} điểm` : `Ảnh tại ${shop} chưa được duyệt`,
+          body: approve ? 'Cảm ơn bạn đã ghé quán. Điểm dùng để đổi voucher ở mục Điểm thưởng.' : `Lý do: ${why}`,
+          cta: approve ? 'Đổi voucher ›' : '',
+          link: '/diem-thuong',
+        });
+      }
+      data.audit_logs.push({
+        id: uid(),
+        actorName: 'Vận hành Frego',
+        actorRole: 'ops',
+        action: `${approve ? 'Duyệt' : 'Từ chối'} ảnh tại quán ${shop}${approve ? '' : `, lý do ${why}`}`,
+        createdAt: t,
+      });
+      return photo;
     },
   };
 
@@ -856,4 +1212,23 @@ export const memoryFiles: FileStore = {
   async uploadLogo(_businessId, file) {
     return `data:${file.contentType};base64,${toBase64(file.bytes)}`;
   },
+  async uploadHomeCover(file) {
+    const storagePath = `demo/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${file.ext}`;
+    return { imageUrl: `data:${file.contentType};base64,${toBase64(file.bytes)}`, storagePath };
+  },
+  async removeHomeCover() {
+    /* DEMO: ảnh nằm trong dòng dữ liệu, không có kho riêng */
+  },
+  async uploadCheckinPhoto(userId, file) {
+    const ext = 'uri' in file ? 'jpg' : file.ext;
+    const path = `${userId}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    demoCheckinPhotos.set(path, 'uri' in file ? file.uri : `data:${file.contentType};base64,${toBase64(file.bytes)}`);
+    return path;
+  },
+  async checkinPhotoUrl(storagePath) {
+    return demoCheckinPhotos.get(storagePath) ?? null;
+  },
 };
+
+/** DEMO: ảnh tại quán giữ trong bộ nhớ tiến trình (theo đường dẫn), mất khi tải lại — đủ cho bản chạy thử. */
+const demoCheckinPhotos = new Map<string, string>();

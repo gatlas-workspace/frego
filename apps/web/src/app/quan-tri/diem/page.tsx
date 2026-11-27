@@ -1,4 +1,5 @@
-// QT 8 · Điểm và mã Frego (WebQtDiemThuong): quy tắc cộng điểm, quà đổi điểm, mã do Frego tự tài trợ, "Tạo mã Frego".
+// QT 8 · Điểm và mã Frego (WebQtDiemThuong): quy tắc cộng điểm, quà đổi điểm, mã do Frego tự tài trợ, "Tạo mã Frego",
+// tab Giới thiệu (UI v3): số lượt tháng này, điểm đã phát, danh sách "giữ để kiểm tra" có Duyệt / Từ chối.
 import type { Metadata } from 'next';
 import { brand } from '@frego/core';
 import {
@@ -22,13 +23,14 @@ import {
 import { adminOpsService } from '@/lib/server/data';
 import { setFregoCodeActiveAction } from './actions';
 import { CreateCodeDrawer } from './_components/CreateCodeDrawer';
+import { ReferralDecision } from './_components/ReferralDecision';
 
 export const metadata: Metadata = { title: 'Điểm và mã Frego' };
 
 type Search = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-const TABS = ['rules', 'gifts', 'codes'] as const;
+const TABS = ['rules', 'gifts', 'codes', 'referrals'] as const;
 type Tab = (typeof TABS)[number];
 
 const ruleCols: TableColumn[] = [
@@ -44,6 +46,17 @@ const giftCols: TableColumn[] = [
   { label: 'Đã đổi tháng này', align: 'right', w: '150px' },
   { label: 'Chi phí', align: 'right', w: '130px', type: 'money' },
   { label: 'Trạng thái', w: '130px' },
+];
+const referralCols: TableColumn[] = [
+  { label: 'Người giới thiệu', w: 'minmax(0,1fr)', type: 'text' },
+  { label: 'Người mới', w: 'minmax(0,1fr)', type: 'text' },
+  { label: 'Nhập mã', w: '150px', type: 'date' },
+  { label: 'Trạng thái', w: '150px' },
+];
+const heldCols: TableColumn[] = [
+  { label: 'Lượt giới thiệu', w: 'minmax(0,1fr)', type: 'text' },
+  { label: 'Lý do giữ', w: 'minmax(0,0.8fr)', type: 'text' },
+  { label: 'Quyết định', w: 'minmax(0,1.3fr)', type: 'none' },
 ];
 const codeCols: TableColumn[] = [
   { label: 'Mã', w: '150px' },
@@ -62,7 +75,7 @@ export default async function PointsPage({ searchParams }: { searchParams: Promi
   const openCodeId = first(params.ma);
 
   const { svc } = await adminOpsService();
-  const v = await svc.getPointsAdmin();
+  const [v, ref] = await Promise.all([svc.getPointsAdmin(), svc.getReferralAdmin()]);
   const { awarded, redeemed, codesUsed, codesCost } = v.stats;
 
   const ruleRows: TableRow[] = v.rules.map((r) => ({
@@ -87,6 +100,19 @@ export default async function PointsPage({ searchParams }: { searchParams: Promi
       c.usedText,
       c.costText,
       { text: c.label.text, status: c.label.tone },
+    ],
+  }));
+
+  const referralRows: TableRow[] = ref.recent.map((r) => ({
+    key: r.id,
+    cells: [r.referrerText, r.refereeText, r.createdText.replace('Nhập mã ', ''), { text: r.label.text, status: r.label.tone }],
+  }));
+  const heldRows: TableRow[] = ref.held.map((r) => ({
+    key: r.id,
+    cells: [
+      { text: `${r.referrerText} → ${r.refereeText}`, sub: r.createdText },
+      r.note ?? 'Giữ để kiểm tra',
+      <ReferralDecision key={r.id} id={r.id} label={`Quyết định lượt ${r.referrerText} giới thiệu ${r.refereeText}`} />,
     ],
   }));
 
@@ -116,6 +142,7 @@ export default async function PointsPage({ searchParams }: { searchParams: Promi
               { key: 'rules', label: 'Quy tắc cộng điểm', count: v.rules.length, icon: 'table' },
               { key: 'gifts', label: 'Quà đổi điểm', count: v.rewards.length },
               { key: 'codes', label: 'Mã Frego', count: v.codes.length },
+              { key: 'referrals', label: 'Giới thiệu', count: ref.held.length || undefined },
             ]}
           />
           {tab === 'rules' ? (
@@ -124,6 +151,29 @@ export default async function PointsPage({ searchParams }: { searchParams: Promi
               <Hint>{v.multiplierNote}</Hint>
               <Callout text={v.fraudNote} tone="amber" icon="info" className="mt-3" />
             </>
+          ) : null}
+          {tab === 'referrals' ? (
+            <div className="flex min-w-0 flex-col gap-4 pt-3">
+              <StatGroup label="Giới thiệu bạn bè tháng này">
+                <StatCard label={ref.stats.rewarded.label} value={ref.stats.rewarded.value} sub={ref.stats.rewarded.sub} />
+                <StatCard label={ref.stats.points.label} value={ref.stats.points.value} sub={ref.stats.points.sub} />
+                <StatCard label={ref.stats.pending.label} value={ref.stats.pending.value} sub={ref.stats.pending.sub} />
+                <StatCard label={ref.stats.held.label} value={ref.stats.held.value} sub={ref.stats.held.sub} />
+              </StatGroup>
+              <Callout text={ref.rulesText} tone="grey" icon="info" />
+              <section aria-labelledby="gt-giu" className="flex min-w-0 flex-col gap-1.5">
+                <h2 id="gt-giu" className="m-0 text-[15px] font-semibold leading-[1.35]">
+                  Giữ lại để kiểm tra
+                </h2>
+                <Table cols={heldCols} rows={heldRows} caption="Giữ lại để kiểm tra" emptyText="Không có lượt nào đang giữ." />
+              </section>
+              <section aria-labelledby="gt-moi" className="flex min-w-0 flex-col gap-1.5">
+                <h2 id="gt-moi" className="m-0 text-[15px] font-semibold leading-[1.35]">
+                  Lượt giới thiệu mới nhất
+                </h2>
+                <Table cols={referralCols} rows={referralRows} caption="Lượt giới thiệu mới nhất" emptyText="Chưa có lượt giới thiệu." />
+              </section>
+            </div>
           ) : null}
           {tab === 'gifts' ? <Table cols={giftCols} rows={giftRows} caption="Quà đổi điểm" flush emptyText="Chưa có quà đổi điểm." /> : null}
           {tab === 'codes' ? (

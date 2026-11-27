@@ -46,10 +46,11 @@ const nailXinh: Business = {
 
 /* ───────────── Quản trị viên (Vận hành 2, Kế toán 1, Hỗ trợ 2; "Vận hành Frego" có sẵn ở base) ───────────── */
 
-const staff = (id: string, displayName: string, adminRole: Profile['adminRole'], phone: string): Profile => ({
+const staff = (id: string, displayName: string, adminRole: Profile['adminRole'], phone: string, referralCode: string): Profile => ({
   id,
   phone,
   displayName,
+  referralCode,
   avatarUrl: null,
   birthday: null,
   interests: [],
@@ -66,10 +67,10 @@ const staff = (id: string, displayName: string, adminRole: Profile['adminRole'],
 });
 
 const staffProfiles: Profile[] = [
-  staff('00000000-0000-4000-8000-0000000000a2', 'Đức Thịnh', 'ops', '+84327878902'),
-  staff('00000000-0000-4000-8000-0000000000a3', 'Thanh Tâm', 'accounting', '+84327878903'),
-  staff('00000000-0000-4000-8000-0000000000a4', 'Ngọc Hân', 'support', '+84327878904'),
-  staff('00000000-0000-4000-8000-0000000000a5', 'Bảo Long', 'support', '+84327878905'),
+  staff('00000000-0000-4000-8000-0000000000a2', 'Đức Thịnh', 'ops', '+84327878902', 'DUCT6W'),
+  staff('00000000-0000-4000-8000-0000000000a3', 'Thanh Tâm', 'accounting', '+84327878903', 'THANT3J'),
+  staff('00000000-0000-4000-8000-0000000000a4', 'Ngọc Hân', 'support', '+84327878904', 'NGOCH7E'),
+  staff('00000000-0000-4000-8000-0000000000a5', 'Bảo Long', 'support', '+84327878905', 'BAOL4Z'),
 ].filter((p) => !adminSeed.profiles?.some((x) => x.id === p.id));
 
 /* ───────────── Yêu cầu hỗ trợ (#1038–#1042) ───────────── */

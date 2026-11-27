@@ -1,4 +1,4 @@
-// Màn 3 · Mở app hãng kèm mã (thiết kế MoApp-v2.dc.html — Be, MoAppGrab-v2.dc.html — Grab; một màn cho mọi hãng)
+// Màn 2e · Mở app hãng kèm mã (thiết kế UI v3: V3-MoApp.dc.html; một màn cho mọi hãng)
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -12,7 +12,7 @@ import { TripMapBackdrop } from '@/components/screens/flow/TripMapBackdrop';
 import { useApi } from '@/lib/api';
 import { usePush } from '@/lib/push';
 import { useTripFlow } from '@/lib/trip-flow';
-import { colors } from '@/theme/tokens';
+import { colors, radius } from '@/theme/tokens';
 
 export default function OpenAppScreen() {
   const { svc } = useApi();
@@ -54,38 +54,44 @@ export default function OpenAppScreen() {
       gap={18}
       scroll
     >
-      <View style={{ gap: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <T weight={800} size={22} lineHeight={28} style={{ flex: 1, minWidth: 0, letterSpacing: -0.3 }} accessibilityRole="header">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <T weight={800} size={12} lineHeight={16} color={colors.muted} style={{ letterSpacing: 0.6 }}>
+            BƯỚC CUỐI
+          </T>
+          <T weight={800} size={22} lineHeight={28} style={{ letterSpacing: -0.3 }} accessibilityRole="header">
             {view.title}
           </T>
-          <BackButton variant="soft" icon="close" onPress={close} accessibilityLabel="Đóng, quay lại chọn hãng xe" />
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <BackButton variant="soft" icon="close" onPress={close} accessibilityLabel="Đóng, quay lại chọn hãng xe" />
+      </View>
+
+      {/* Thẻ xe hai tầng: hãng + tuyến, rồi giá ước tính sau mã */}
+      <View style={{ borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
+        <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <VehicleTile brand={view.providerId} kind={view.vehicleClass} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <T weight={700} size={15} lineHeight={20}>
-              {view.serviceLine}
+            <T weight={800} size={16} lineHeight={21}>
+              {name}
             </T>
-            {hasEstimate ? (
-              <T size={14} lineHeight={20} color={colors.ink2}>
-                ước tính sau mã{' '}
-                <T weight={700} size={14} lineHeight={20}>
-                  {noBreak(view.estimateText)}
-                </T>
-              </T>
-            ) : (
-              <T size={14} lineHeight={20} color={colors.ink2}>
-                Chưa có giá ước tính, xem giá trong app {name}.
-              </T>
-            )}
+            <T size={13} lineHeight={18} color={colors.ink2} numberOfLines={1}>
+              {plan.title}
+            </T>
           </View>
+        </View>
+        <View style={{ paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.bg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <T weight={600} size={13} lineHeight={18} color={colors.ink2}>
+            {hasEstimate ? 'Ước tính sau mã' : 'Giá chuyến'}
+          </T>
+          <T weight={800} size={16} lineHeight={21} style={{ flexShrink: 1, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+            {hasEstimate ? noBreak(view.estimateText) : `Xem trong app ${name}`}
+          </T>
         </View>
       </View>
 
       {view.code ? (
         <View style={{ gap: 8 }}>
-          <CodeBox code={view.code} codeLine={view.codeLine} copied={copied} onCopy={copyCode} />
+          <CodeBox code={view.code} codeLine={view.codeLine} origin={sponsorAd ? `Quà của ${sponsorAd.name}` : null} copied={copied} onCopy={copyCode} />
           {copyFailed ? (
             <T size={13} lineHeight={19} color={colors.ink2} accessibilityLiveRegion="polite">
               Chưa chép được mã. Bạn nhập tay mã {view.code} trong app {name} nhé.

@@ -218,6 +218,7 @@ const ngocLinh: Profile = {
   id: NGOC_LINH_ID,
   phone: '+84903552552',
   displayName: 'Ngọc Linh',
+  referralCode: 'NGOCL9D',
   avatarUrl: null,
   birthday: null,
   interests: [],

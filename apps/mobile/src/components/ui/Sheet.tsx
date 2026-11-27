@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from 'react';
 import { PanResponder, Pressable, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from './Text';
+import { SlideUp } from '@/components/motion';
 import { colors, radius, shadow } from '@/theme/tokens';
 
 /** Thanh kéo 44×5 trên đầu tấm trượt. */
@@ -172,7 +173,7 @@ export function ModalSheet({ children, backdrop, onDismiss, dismissLabel = 'Đó
         accessibilityLabel={onDismiss ? dismissLabel : undefined}
         style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: colors.scrim }}
       />
-      <View
+      <SlideUp
         accessibilityViewIsModal
         style={[
           {
@@ -199,7 +200,7 @@ export function ModalSheet({ children, backdrop, onDismiss, dismissLabel = 'Đó
             {children}
           </View>
         )}
-      </View>
+      </SlideUp>
     </View>
   );
 }

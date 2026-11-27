@@ -33,6 +33,9 @@ export function createSupabaseDb(client: SupabaseClient, opts: SupabaseDbOptions
   /** Logo quán: công khai, chủ quán tải thẳng (không cần duyệt, như cột logo_url). */
   const LOGOS = 'business-logos';
   const PREFIX = `storage:${PRIVATE}/`;
+  /** Ảnh bìa Trang chủ (công khai) và ảnh tại quán (riêng tư). */
+  const COVERS = 'app-banners';
+  const CHECKINS = 'checkin-photos';
   const files: FileStore = {
     async uploadPrivate(businessId, file) {
       const path = `${businessId}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${file.ext}`;
@@ -58,6 +61,43 @@ export function createSupabaseDb(client: SupabaseClient, opts: SupabaseDbOptions
       const { error } = await client.storage.from(LOGOS).upload(path, file.bytes, { contentType: file.contentType, upsert: false });
       fail('storage', error);
       return client.storage.from(LOGOS).getPublicUrl(path).data.publicUrl;
+    },
+    // Ảnh bìa Trang chủ (QT 13): bucket công khai, chỉ quản trị ops ghi (migration 20261127001200_v3_referral_cover_photo.sql).
+    async uploadHomeCover(file) {
+      const storagePath = `${new Date().getUTCFullYear()}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${file.ext}`;
+      const { error } = await client.storage.from(COVERS).upload(storagePath, file.bytes, { contentType: file.contentType, upsert: false });
+      fail('storage', error);
+      return { imageUrl: client.storage.from(COVERS).getPublicUrl(storagePath).data.publicUrl, storagePath };
+    },
+    async removeHomeCover(storagePath) {
+      if (!storagePath) return;
+      const { error } = await client.storage.from(COVERS).remove([storagePath]);
+      fail('storage', error);
+    },
+    // Ảnh tại quán: bucket riêng, thư mục "<userId>/…" (chỉ chủ ảnh tải lên; quản trị xem bằng URL ký).
+    async uploadCheckinPhoto(userId, file) {
+      let body: Uint8Array | Blob;
+      let contentType = 'image/jpeg';
+      let ext = 'jpg';
+      if ('uri' in file) {
+        // React Native: đọc tệp từ uri (fetch hỗ trợ file://, content://).
+        body = await (await fetch(file.uri)).blob();
+        contentType = body.type || contentType;
+      } else {
+        body = file.bytes;
+        contentType = file.contentType;
+        ext = file.ext;
+      }
+      const path = `${userId}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await client.storage.from(CHECKINS).upload(path, body, { contentType, upsert: false });
+      fail('storage', error);
+      return path;
+    },
+    async checkinPhotoUrl(storagePath) {
+      if (!storagePath) return null;
+      const { data, error } = await client.storage.from(CHECKINS).createSignedUrl(storagePath, 3600);
+      if (error) return null;
+      return data?.signedUrl ?? null;
     },
   };
 

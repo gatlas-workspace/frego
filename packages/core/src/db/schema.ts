@@ -5,6 +5,7 @@
 import type {
   AdBanner,
   AdBannerPublic,
+  AppBanner,
   AppNotification,
   AuditLog,
   Broadcast,
@@ -28,8 +29,10 @@ import type {
   PublicCode,
   RecentSearch,
   Redemption,
+  Referral,
   Reward,
   SavedPlace,
+  ShopPhoto,
   SupportTicket,
   TicketMessage,
   Trip,
@@ -88,6 +91,12 @@ export interface Tables {
   gmail_connections: GmailConnection;
   /** Biên nhận email đã ghi (chỉ RPC record_receipt ghi) */
   gmail_receipts: GmailReceipt;
+  /** Giới thiệu bạn bè (chỉ RPC ghi; người dùng đọc dòng mình là người giới thiệu / người mới) */
+  referrals: Referral;
+  /** Ảnh bìa Trang chủ (QT 13). Supabase: chỉ quản trị ops đọc/ghi bảng; app đọc qua RPC active_home_cover */
+  app_banners: AppBanner;
+  /** Ảnh tại quán (chỉ RPC submit_shop_photo / review_shop_photo ghi) */
+  shop_photos: ShopPhoto;
   /** View chỉ đọc: thông tin quán công khai */
   businesses_public: BusinessPublic;
   /** View chỉ đọc: chiến dịch công khai (không có ngân sách) */
@@ -134,6 +143,9 @@ export const PRIMARY_KEYS: { [K in TableName]: keyof Tables[K] & string } = {
   ad_banners: 'id',
   gmail_connections: 'userId',
   gmail_receipts: 'id',
+  referrals: 'id',
+  app_banners: 'id',
+  shop_photos: 'id',
   businesses_public: 'id',
   campaigns_public: 'id',
   ad_banners_public: 'id',

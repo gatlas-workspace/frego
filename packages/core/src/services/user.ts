@@ -5,6 +5,7 @@
 import { brand } from '../brand';
 import {
   CATEGORY_LABEL,
+  POINTS_RULES,
   PROVIDERS,
   SERVICES,
   VEHICLE_ORDER,
@@ -14,7 +15,8 @@ import {
   serviceLongLabel,
   serviceShortLabel,
 } from '../catalog';
-import type { Db } from '../db/types';
+import type { Db, ReferralCheckResult } from '../db/types';
+import { sha256Hex, utf8Bytes } from '../sha256';
 import {
   formatDate,
   formatDayGroup,
@@ -51,8 +53,11 @@ import type {
   Profile,
   ProviderId,
   PublicCode,
+  ReferralStatus,
   SavedPlaceKind,
   ServiceKey,
+  ShopPhoto,
+  ShopPhotoStatus,
   Trip,
   UserVoucher,
   VehicleClass,
@@ -142,6 +147,8 @@ export interface DealView {
   cta: string;
   /** Điểm đến khi bấm (địa điểm gần quán nhất) */
   destPlaceId: string;
+  /** Hạn chiến dịch theo ngày giờ VN: "Còn 3 ngày", "Còn 1 ngày", "Hết hạn hôm nay" */
+  endsInText: string;
 }
 
 /**
@@ -198,6 +205,10 @@ export interface HomeView {
   recent: PlaceView[];
   deals: DealView[];
   unreadCount: number;
+  /** Tên hiện ở lời chào (tên hồ sơ); '' với khách hoặc chưa đặt tên */
+  greetingName: string;
+  /** Chip ví ở đầu Trang chủ: "3 mã · 1.250 điểm"; khách: "Mã công khai" */
+  walletChip: string;
 }
 
 /** Đường vẽ trên bản đồ: theo đường phố (`road`) hoặc nối thẳng khi không tìm được đường (`estimate`). */
@@ -469,6 +480,90 @@ export interface LinkRowView {
   linked: boolean;
   isRideApp: boolean;
 }
+
+/** Màn Giới thiệu bạn bè (UI v3). */
+export interface ReferralFriendView {
+  id: string;
+  /** Tên đã che: "Lan N." */
+  name: string;
+  /** Chữ cái đầu cho ô avatar: "L" */
+  initial: string;
+  status: ReferralStatus;
+  /** "Báo giá chuyến đầu 24/11", "Nhập mã 25/11 · còn 28 ngày", "Nhập mã 12/10, chưa có chuyến" */
+  sub: string;
+  /** Điểm mình nhận từ lượt này (đã cộng): 200 hoặc 0 */
+  points: number;
+}
+
+export interface ReferralView {
+  code: string;
+  /** `https://frego.vn/moi/<mã>` */
+  link: string;
+  rewardReferrer: number;
+  rewardReferee: number;
+  monthlyCap: number;
+  /** Số lượt được thưởng tháng này (giờ VN) */
+  monthRewarded: number;
+  /** Tổng điểm đã nhận từ giới thiệu (cả lượt mình được giới thiệu) */
+  pointsEarned: number;
+  friends: ReferralFriendView[];
+  /** Còn nhập được mã của bạn bè (đăng nhập số điện thoại, chưa nhập, trong 7 ngày đầu) */
+  canEnter: boolean;
+  /** Số ngày còn lại để nhập mã (khi canEnter) */
+  enterDaysLeft: number | null;
+  /** Người đã giới thiệu mình */
+  enteredBy: { name: string } | null;
+}
+
+/** Ảnh bìa Trang chủ đang hiện (null → app dùng ảnh mặc định "Sài Gòn tím"). */
+export interface HomeCoverView {
+  imageUrl: string;
+  /** Lớp phủ tối #14152B: 0 | 0.2 | 0.4 | 0.6 */
+  overlay: number;
+  title: string;
+}
+
+/** Khối "Ghé quán? Chụp ảnh nhận điểm" ở màn Báo giá. */
+export interface ShopPhotoStateView {
+  shopName: string;
+  status: 'none' | ShopPhotoStatus;
+  /** Điểm thưởng khi được duyệt */
+  points: number;
+  rejectReason: string | null;
+}
+
+export interface ShopPhotoInput {
+  /** Ảnh đã chụp: Blob (web) hoặc `{ uri }` (React Native, expo-image-picker) */
+  file: Blob | { uri: string };
+  /** ISO, giờ chụp (EXIF hoặc lúc chụp) */
+  takenAt: string;
+  lat: number;
+  lng: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/** Đọc byte của Blob: arrayBuffer() nếu có, không thì FileReader; không đọc được → null. */
+async function blobBytes(blob: Blob): Promise<Uint8Array | null> {
+  try {
+    if (typeof blob.arrayBuffer === 'function') return new Uint8Array(await blob.arrayBuffer());
+  } catch {
+    /* thử FileReader */
+  }
+  if (typeof FileReader === 'undefined') return null;
+  return new Promise((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result instanceof ArrayBuffer ? new Uint8Array(reader.result) : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsArrayBuffer(blob);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+const IMAGE_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic' };
 
 export interface NotificationView extends AppNotification {
   unread: boolean;
@@ -839,14 +934,20 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
     async getHome(): Promise<HomeView> {
       const uid = me();
       const origin = await currentOrigin();
-      const [saved, recent, byId, vouchers, camps, unread] = await Promise.all([
+      const [saved, recent, byId, vouchers, camps, unread, profile] = await Promise.all([
         db.list('saved_places', { where: { userId: uid }, order: { column: 'createdAt' } }),
         db.list('recent_searches', { where: { userId: uid }, order: { column: 'searchedAt', ascending: false }, limit: 2 }),
         placesById(),
         myVouchers(),
         activeCampaigns(),
         service.unreadCount(),
+        db.get('profiles', uid),
       ]);
+      // Khách (tài khoản ẩn danh, chưa có số điện thoại) giống quy ước của record_trip.
+      const guest = !profile?.phone;
+      const usable = vouchers.filter((v) => v.status === 'active').length;
+      const walletChip = guest ? 'Mã công khai' : `${formatNumber(usable)} mã · ${formatNumber(profile?.points ?? 0)} điểm`;
+      const nowT = db.now();
       const welcome = vouchers.find((v) => v.source === 'frego' && v.status === 'active');
       const banner: BannerView | null = welcome
         ? {
@@ -889,6 +990,7 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
             amountText: formatDiscount(c.amount),
             cta: 'Đặt xe ›',
             destPlaceId: nearest ? nearest.p.id : `biz:${c.businessId}`,
+            endsInText: endsInText(c.endsAt, nowT),
           };
         });
       const recentPlaces = recent.map((r) => byId.get(r.placeId)).filter((p): p is Place => !!p);
@@ -905,6 +1007,8 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
         recent: await toPlaceViews(recentPlaces, origin),
         deals,
         unreadCount: unread,
+        greetingName: guest ? '' : (profile?.displayName ?? '').trim(),
+        walletChip,
       };
     },
 
@@ -1710,6 +1814,156 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
       return result;
     },
 
+    /* ───── Giới thiệu bạn bè ───── */
+
+    async getReferral(): Promise<ReferralView> {
+      const r = await db.rpc('my_referrals', {});
+      const R = POINTS_RULES.referral;
+      const nowT = db.now().getTime();
+      // Số ngày còn lại tính theo ngày lịch giờ VN: nhập mã 20/11, hôm nay 22/11 → còn 30 − 2 = 28 ngày.
+      const vnDay = (t: string | number) => Math.floor((new Date(t).getTime() + 7 * 3600_000) / DAY_MS);
+      const friends: ReferralFriendView[] = r.friends.map((f) => {
+        const daysLeft = Math.max(1, R.qualifyDays - (vnDay(nowT) - vnDay(f.createdAt)));
+        const sub =
+          f.status === 'rewarded'
+            ? `Báo giá chuyến đầu ${formatDayMonth(f.rewardedAt ?? f.qualifiedAt ?? f.createdAt)}`
+            : f.status === 'pending'
+              ? `Nhập mã ${formatDayMonth(f.createdAt)} · còn ${daysLeft} ngày`
+              : f.status === 'held'
+                ? 'Đang giữ lại để Frego kiểm tra'
+                : f.status === 'expired'
+                  ? `Nhập mã ${formatDayMonth(f.createdAt)}, chưa có chuyến`
+                  : 'Không đủ điều kiện nhận thưởng';
+        return {
+          id: f.id,
+          name: f.name,
+          initial: (f.name.trim()[0] ?? 'F').toUpperCase(),
+          status: f.status,
+          sub,
+          points: f.status === 'rewarded' ? R.referrer : 0,
+        };
+      });
+      const deadline = new Date(r.accountCreatedAt).getTime() + R.enterDays * DAY_MS;
+      const canEnter = !r.guest && !r.enteredBy && nowT < deadline;
+      return {
+        code: r.code,
+        link: `https://${brand.web.domain}/moi/${r.code}`,
+        rewardReferrer: R.referrer,
+        rewardReferee: R.referee,
+        monthlyCap: R.monthlyCap,
+        monthRewarded: r.monthRewarded,
+        pointsEarned:
+          friends.filter((f) => f.status === 'rewarded').length * R.referrer + (r.enteredBy?.status === 'rewarded' ? R.referee : 0),
+        friends,
+        canEnter,
+        enterDaysLeft: canEnter ? Math.max(1, R.enterDays - (vnDay(nowT) - vnDay(r.accountCreatedAt))) : null,
+        enteredBy: r.enteredBy ? { name: r.enteredBy.name } : null,
+      };
+    },
+
+    /** Kiểm tra mã bạn bè trước khi áp dụng (không ghi gì). */
+    async checkReferralCode(code: string): Promise<ReferralCheckResult> {
+      return db.rpc('check_referral_code', { code });
+    },
+
+    /** Nhập mã giới thiệu. Lỗi (mã sai, mã của mình, đã nhập, quá 7 ngày, khách) ném câu tiếng Việt. */
+    async applyReferralCode(code: string): Promise<{ ownerName: string }> {
+      return db.rpc('apply_referral_code', { code });
+    },
+
+    /* ───── Ảnh bìa Trang chủ ───── */
+
+    /** Ảnh bìa đang hiện; null (không có / lỗi mạng / URL lạ) → app dùng ảnh mặc định. */
+    async getHomeCover(): Promise<HomeCoverView | null> {
+      try {
+        const c = await db.rpc('active_home_cover', {});
+        const imageUrl = safeImageUrl(c?.imageUrl);
+        if (!c || !imageUrl) return null;
+        return { imageUrl, overlay: Number(c.overlay) || 0, title: c.title };
+      } catch {
+        return null;
+      }
+    },
+
+    /* ───── Ảnh tại quán ───── */
+
+    /** Trạng thái ảnh tại quán của chuyến; null khi chuyến không dùng mã của quán tài trợ. */
+    async getShopPhotoState(tripId: string): Promise<ShopPhotoStateView | null> {
+      const uid = me();
+      const t = await db.get('trips', tripId);
+      if (!t || t.userId !== uid) return null;
+      const codes = t.attached
+        .filter((c) => c.source === 'sponsor')
+        .sort((a, b) => Number(b.service === t.chosenService) - Number(a.service === t.chosenService));
+      let shopName: string | null = null;
+      for (const code of codes) {
+        const campaignId = code.refId.startsWith('uv:')
+          ? ((await db.get('user_vouchers', code.refId.slice(3)))?.campaignId ?? null)
+          : code.refId.startsWith('cp:')
+            ? code.refId.slice(3)
+            : null;
+        const camp = campaignId ? await db.get('campaigns_public', campaignId) : null;
+        const biz = camp ? await db.get('businesses_public', camp.businessId) : null;
+        if (biz) {
+          shopName = biz.name;
+          break;
+        }
+      }
+      if (!shopName) return null;
+      const [photo] = await db.list('shop_photos', { where: { tripId: t.id, userId: uid }, limit: 1 });
+      return {
+        shopName,
+        status: photo?.status ?? 'none',
+        points: POINTS_RULES.shopPhoto,
+        rejectReason: photo?.rejectReason ?? null,
+      };
+    },
+
+    /**
+     * Gửi ảnh tại quán: tính SHA-256 của ảnh, tải lên kho riêng `checkin-photos/<uid>/…`, rồi gọi RPC submit_shop_photo
+     * (máy chủ kiểm chuyến, giờ chụp, vị trí ≤ 150 m, mỗi chuyến một ảnh, ảnh không trùng). Chờ Frego duyệt mới cộng điểm.
+     */
+    async submitShopPhoto(tripId: string, input: ShopPhotoInput): Promise<ShopPhoto> {
+      const uid = me();
+      const state = await service.getShopPhotoState(tripId);
+      if (!state) throw new Error('Chuyến này không dùng mã của quán tài trợ');
+      if (state.status !== 'none') throw new Error('Chuyến này đã gửi ảnh tại quán rồi');
+      const f = input.file;
+      let bytes: Uint8Array | null = null;
+      let contentType = 'image/jpeg';
+      let uri: string | null = null;
+      if ('uri' in f && typeof f.uri === 'string') {
+        uri = f.uri;
+        if (db.mode === 'supabase') {
+          try {
+            bytes = new Uint8Array(await (await fetch(f.uri)).arrayBuffer());
+          } catch {
+            bytes = null;
+          }
+        }
+      } else {
+        const blob = f as Blob;
+        bytes = await blobBytes(blob);
+        contentType = blob.type || contentType;
+        if (!bytes) throw new Error('Không đọc được ảnh. Thử chụp lại.');
+      }
+      if (bytes && !bytes.length) throw new Error('Không đọc được ảnh. Thử chụp lại.');
+      // Không đọc được byte từ uri (một số máy): băm uri + giờ chụp; máy chủ vẫn chặn trùng chuyến.
+      const sha256 = await sha256Hex(bytes ?? utf8Bytes(`${uri ?? ''}|${input.takenAt}`));
+      const storagePath = await db.files.uploadCheckinPhoto(
+        uid,
+        bytes ? { bytes, contentType, ext: IMAGE_EXT[contentType] ?? 'jpg' } : { uri: uri ?? '' },
+      );
+      return db.rpc('submit_shop_photo', {
+        tripId,
+        storagePath,
+        sha256,
+        takenAt: input.takenAt,
+        lat: input.lat,
+        lng: input.lng,
+      });
+    },
+
     /* ───── Thông báo ───── */
 
     async listNotifications(): Promise<NotificationView[]> {
@@ -1810,6 +2064,16 @@ function serviceLongLabelLower(key: ServiceKey) {
 }
 
 /** "2 giờ trước", "hôm qua" */
+/** Hạn còn lại theo ngày lịch giờ VN: hết hạn trong hôm nay → "Hết hạn hôm nay", còn lại → "Còn N ngày". */
+export function endsInText(endsAt: string, now: Date): string {
+  const day = (d: Date | string) => {
+    const p = vnParts(d);
+    return Date.UTC(p.year, p.month - 1, p.day) / 86_400_000;
+  };
+  const days = day(endsAt) - day(now);
+  return days <= 0 ? 'Hết hạn hôm nay' : `Còn ${days} ngày`;
+}
+
 function checkedAgo(iso: string, nowT: number): string {
   return formatRelative(iso, nowT);
 }

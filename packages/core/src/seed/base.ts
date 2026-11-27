@@ -22,8 +22,10 @@ import type {
   Profile,
   PublicCode,
   RecentSearch,
+  Referral,
   Reward,
   SavedPlace,
+  ShopPhoto,
   Trip,
   UserVoucher,
 } from '../types';
@@ -116,6 +118,7 @@ export const profiles: Profile[] = [
     id: DEMO_USER_ID,
     phone: '+84909555123',
     displayName: 'Minh Anh',
+    referralCode: 'MINHA7K',
     interests: ['cafe', 'food'],
     vehiclePrefs: ['bike'],
     points: 1250,
@@ -129,6 +132,7 @@ export const profiles: Profile[] = [
     id: '00000000-0000-4000-8000-000000000002',
     phone: '+84938222456',
     displayName: 'Gia Huy',
+    referralCode: 'GIAH4P',
     points: 640,
     savedAmount: 40000,
     savedCount: 3,
@@ -140,6 +144,7 @@ export const profiles: Profile[] = [
     id: '00000000-0000-4000-8000-000000000003',
     phone: '+84977111789',
     displayName: 'Thu Hà',
+    referralCode: 'THUH8M',
     points: 2180,
     savedAmount: 30000,
     savedCount: 2,
@@ -153,6 +158,7 @@ export const profiles: Profile[] = [
     id: '00000000-0000-4000-8000-000000000004',
     phone: '+84903444012',
     displayName: 'Quốc Bảo',
+    referralCode: 'QUOCB3X',
     points: 310,
     savedAmount: 20000,
     savedCount: 2,
@@ -164,6 +170,7 @@ export const profiles: Profile[] = [
     id: DEMO_ADMIN_ID,
     phone: '+84327878987',
     displayName: 'Vận hành Frego',
+    referralCode: 'VANF2R',
     role: 'admin',
     adminRole: 'ops',
     createdAt: vn('2026-07-01 09:00'),
@@ -174,8 +181,99 @@ export const profiles: Profile[] = [
     id: DEMO_OWNER_ID,
     phone: '+84283000482',
     displayName: 'Chủ Cà phê Mây',
+    referralCode: 'CHUM5T',
     createdAt: vn('2026-09-05 10:00'),
     onboardedAt: vn('2026-09-05 10:00'),
+  },
+];
+
+/** Bạn bè Minh Anh đã giới thiệu (màn Giới thiệu bạn bè). Lan Nguyễn có mã LAN7QX để thử nhập mã ở tài khoản mới. */
+export const LAN_ID = '00000000-0000-4000-8000-0000000000c1';
+export const HUNG_ID = '00000000-0000-4000-8000-0000000000c2';
+export const VY_ID = '00000000-0000-4000-8000-0000000000c3';
+export const KHOA_ID = '00000000-0000-4000-8000-0000000000c4';
+
+export const friendProfiles: Profile[] = [
+  {
+    ...baseProfile,
+    id: LAN_ID,
+    phone: '+84908111222',
+    displayName: 'Lan Nguyễn',
+    referralCode: 'LAN7QX',
+    points: 100,
+    createdAt: vn('2026-11-08 19:00'),
+    onboardedAt: vn('2026-11-08 19:04'),
+  },
+  {
+    ...baseProfile,
+    id: HUNG_ID,
+    phone: '+84909333444',
+    displayName: 'Hùng Trần',
+    referralCode: 'HUNGT5R',
+    points: 100,
+    createdAt: vn('2026-11-14 10:00'),
+    onboardedAt: vn('2026-11-14 10:01'),
+  },
+  {
+    ...baseProfile,
+    id: VY_ID,
+    phone: '+84937555666',
+    displayName: 'Vy Phạm',
+    referralCode: 'VYP8KD',
+    createdAt: vn('2026-11-20 21:00'),
+    onboardedAt: vn('2026-11-20 21:02'),
+  },
+  {
+    ...baseProfile,
+    id: KHOA_ID,
+    phone: '+84976777888',
+    displayName: 'Khoa Lê',
+    referralCode: 'KHOAL2N',
+    createdAt: vn('2026-10-12 09:00'),
+    onboardedAt: vn('2026-10-12 09:01'),
+  },
+];
+
+export const referrals: Referral[] = [
+  {
+    id: 'ref-lan',
+    referrerId: DEMO_USER_ID,
+    refereeId: LAN_ID,
+    status: 'rewarded',
+    createdAt: vn('2026-11-08 19:05'),
+    qualifiedAt: vn('2026-11-12 08:30'),
+    rewardedAt: vn('2026-11-12 08:30'),
+    note: null,
+  },
+  {
+    id: 'ref-hung',
+    referrerId: DEMO_USER_ID,
+    refereeId: HUNG_ID,
+    status: 'rewarded',
+    createdAt: vn('2026-11-14 10:02'),
+    qualifiedAt: vn('2026-11-18 18:20'),
+    rewardedAt: vn('2026-11-18 18:20'),
+    note: null,
+  },
+  {
+    id: 'ref-vy',
+    referrerId: DEMO_USER_ID,
+    refereeId: VY_ID,
+    status: 'pending',
+    createdAt: vn('2026-11-20 21:03'),
+    qualifiedAt: null,
+    rewardedAt: null,
+    note: null,
+  },
+  {
+    id: 'ref-khoa',
+    referrerId: DEMO_USER_ID,
+    refereeId: KHOA_ID,
+    status: 'expired',
+    createdAt: vn('2026-10-12 09:05'),
+    qualifiedAt: null,
+    rewardedAt: null,
+    note: 'Quá 30 ngày chưa có chuyến đầu',
   },
 ];
 
@@ -820,7 +918,33 @@ export const pointsLedger: PointsEntry[] = [
   { id: 'pe-2', userId: DEMO_USER_ID, delta: 10, reason: 'Báo giá một chạm, Grab ô tô', tripId: null, createdAt: vn('2026-11-19 09:00') },
   { id: 'pe-3', userId: DEMO_USER_ID, delta: 10, reason: 'Báo giá một chạm, Be xe máy', tripId: null, createdAt: vn('2026-11-15 18:00') },
   { id: 'pe-4', userId: DEMO_USER_ID, delta: 50, reason: 'Biên nhận email, Grab ô tô 78.000đ', tripId: 'trip-yday-am', createdAt: vn('2026-11-12 09:00') },
-  { id: 'pe-0', userId: DEMO_USER_ID, delta: 1130, reason: 'Điểm tích lũy trước đó', tripId: null, createdAt: vn('2026-11-01 00:00') },
+  { id: 'pe-ref-hung', userId: DEMO_USER_ID, delta: 200, reason: 'Giới thiệu bạn bè: Hùng T.', tripId: null, createdAt: vn('2026-11-18 18:20') },
+  { id: 'pe-ref-lan', userId: DEMO_USER_ID, delta: 200, reason: 'Giới thiệu bạn bè: Lan N.', tripId: null, createdAt: vn('2026-11-12 08:30') },
+  { id: 'pe-0', userId: DEMO_USER_ID, delta: 730, reason: 'Điểm tích lũy trước đó', tripId: null, createdAt: vn('2026-11-01 00:00') },
+  { id: 'pe-lan-ref', userId: LAN_ID, delta: 100, reason: 'Nhập mã giới thiệu của Minh A.', tripId: null, createdAt: vn('2026-11-12 08:30') },
+  { id: 'pe-hung-ref', userId: HUNG_ID, delta: 100, reason: 'Nhập mã giới thiệu của Minh A.', tripId: null, createdAt: vn('2026-11-18 18:20') },
+];
+
+/* ───────────── Ảnh tại quán (chờ duyệt ở QT) ───────────── */
+
+export const shopPhotos: ShopPhoto[] = [
+  {
+    id: 'sph-banh-moc',
+    userId: DEMO_USER_ID,
+    tripId: 'trip-fri',
+    businessId: 'biz-banh-moc',
+    storagePath: `${DEMO_USER_ID}/demo-banh-moc.jpg`,
+    sha256: '5d41402abc4b2a76b9719d911017c592ae1d2f8e1b6b0e7f5a0c3d6a7e8f9a01',
+    takenAt: vn('2026-11-20 13:05'),
+    lat: 10.7896,
+    lng: 106.6899,
+    distanceM: 15,
+    status: 'pending',
+    rejectReason: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    createdAt: vn('2026-11-20 13:06'),
+  },
 ];
 
 /* ───────────── Thông báo ───────────── */
