@@ -3,11 +3,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NotificationCategory, NotificationView } from '@frego/core';
-import { Button, NotifItem, SectionTitle, T, Tabs } from '@/components/ui';
-import { Rise } from '@/components/motion';
+import { Button, Icon, NotifItem, SectionTitle, T, UnderlineTabs } from '@/components/ui';
+import { Rise, pressScale } from '@/components/motion';
 import { usePullRefresh } from '@/components/screens/account/usePullRefresh';
 import { ErrorView, InlineError, LoadingView } from '@/components/screens/account/ScreenState';
 import { refreshAll, useApi } from '@/lib/api';
@@ -113,23 +113,37 @@ export default function ThongBaoScreen() {
   );
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* Đầu màn v3: nền trắng, tiêu đề + số chưa đọc, nút cài đặt, tab gạch chân */}
+      <View style={{ paddingTop: Math.max(insets.top + 12, layout.topInset), paddingHorizontal: 20, gap: 12, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <T variant="tabTitle" accessibilityRole="header" style={{ letterSpacing: -0.4 }}>
+              Thông báo
+            </T>
+            {list.data ? (
+              <T size={13} lineHeight={18} color={colors.ink2} accessibilityLiveRegion="polite" role="status">
+                {unread > 0 ? `${unread} thông báo chưa đọc` : 'Bạn đã đọc hết thông báo.'}
+              </T>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => router.push('/cai-dat-thong-bao')}
+            accessibilityRole="button"
+            accessibilityLabel="Cài đặt thông báo"
+            style={({ pressed }) => [{ width: 44, height: 44, borderRadius: 22, backgroundColor: pressed ? colors.track : colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }, pressScale(pressed)]}
+          >
+            <Icon name="sliders" size={20} color={colors.ink} strokeWidth={2} />
+          </Pressable>
+        </View>
+        <UnderlineTabs items={FILTERS} value={filter} onChange={setFilter} accessibilityLabel="Lọc thông báo" style={{ justifyContent: 'flex-start', gap: 20 }} />
+      </View>
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingTop: Math.max(insets.top + 12, layout.topInset), paddingHorizontal: 20, paddingBottom: 24, gap: 16 }}
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 24, gap: 16 }}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl {...pull} tintColor={colors.primary} />}
     >
-      <View style={{ gap: 4 }}>
-        <T variant="tabTitle" accessibilityRole="header" style={{ letterSpacing: -0.5 }}>
-          Thông báo
-        </T>
-        {list.data ? (
-          <T size={14} lineHeight={21} color={colors.ink2} accessibilityLiveRegion="polite" role="status">
-            {unread > 0 ? `${unread} thông báo chưa đọc` : 'Bạn đã đọc hết thông báo.'}
-          </T>
-        ) : null}
-      </View>
-      <Tabs items={FILTERS} value={filter} onChange={setFilter} accessibilityLabel="Lọc thông báo" />
       {error ? <InlineError text={error} /> : null}
       {list.data ? (
         shown.length ? (
@@ -157,5 +171,6 @@ export default function ThongBaoScreen() {
         <LoadingView style={{ flexGrow: 0, paddingVertical: 40 }} />
       )}
     </ScrollView>
+    </View>
   );
 }

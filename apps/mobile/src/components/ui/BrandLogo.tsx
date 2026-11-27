@@ -133,11 +133,11 @@ export function MonoLogo({ text, size = 40, radius = 12, style }: MonoLogoProps)
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={[
-        { width: size, height: size, borderRadius: radius, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+        { width: size, height: size, borderRadius: radius, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
         style,
       ]}
     >
-      <T weight={800} size={13} color={colors.white}>
+      <T weight={800} size={13} color={colors.ink2}>
         {text}
       </T>
     </View>

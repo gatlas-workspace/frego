@@ -27,6 +27,7 @@ export type { Tables, TableName, Row, Seed, StatRow } from './db/schema';
 export { PRIMARY_KEYS } from './db/schema';
 export {
   createMemoryDb,
+  demoSignUp,
   uid,
   genCode,
   genReferralCode,

@@ -17,7 +17,7 @@ import {
   createGoongGeocoder,
   createPhotonGeocoder,
   createValhallaRouter,
-  DEMO_USER_ID,
+  demoSignUp,
   maskPhone,
   toE164Vn,
   type Db,
@@ -51,8 +51,8 @@ const geocoder = GOONG_KEY
     ? null
     : createPhotonGeocoder({ baseUrl: GEOCODING_URL });
 
-/** Bản 3.0 đổi khóa: dữ liệu demo cũ thiếu mã giới thiệu, ảnh bìa, ảnh tại quán → nạp lại dữ liệu mẫu mới. */
-const DEMO_DATA_KEY = 'frego.demo.data.v3';
+/** Đổi khóa khi dữ liệu mẫu đổi (v3: giới thiệu, ảnh bìa, ảnh tại quán; v4: câu chữ "Chuyến … thế nào?", tài khoản DEMO theo số điện thoại) → nạp lại dữ liệu mẫu mới. */
+const DEMO_DATA_KEY = 'frego.demo.data.v4';
 const DEMO_SESSION_KEY = 'frego.demo.session.v1';
 /** DEMO: tài khoản khách ("Xem voucher trước, đăng nhập sau"). */
 const DEMO_GUEST_ID = '00000000-0000-4000-8000-00000000ff01';
@@ -173,9 +173,12 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         if (error) return { ok: false, error: 'Mã chưa đúng hoặc đã hết hạn.' };
         await supa.refreshUser();
       } else {
-        // DEMO: đăng nhập vào tài khoản mẫu Minh Anh để xem đủ dữ liệu.
-        demoDb.setUser(DEMO_USER_ID);
-        await AsyncStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({ userId: DEMO_USER_ID, guest: false }));
+        // DEMO: số của tài khoản mẫu Minh Anh (0909 555 123) vào Minh Anh để xem đủ dữ liệu; số khác tạo tài khoản
+        // mới (lần đầu) hoặc vào lại tài khoản đã tạo bằng số đó. Hồ sơ lưu cùng dữ liệu DEMO (AsyncStorage).
+        if (!phone) return { ok: false, error: 'Nhập số điện thoại trước.' };
+        const { userId } = await demoSignUp(demoDb, phone);
+        demoDb.setUser(userId);
+        await AsyncStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({ userId, guest: false }));
       }
       const welcome = await svc.ensureWelcomeVoucher().catch(() => null);
       setGuest(false);
@@ -249,8 +252,14 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     const fresh = createSeed();
     for (const k of Object.keys(fresh) as (keyof Seed)[]) (demoDb.data as Record<string, unknown>)[k] = fresh[k];
     await AsyncStorage.setItem(DEMO_DATA_KEY, JSON.stringify(demoDb.data));
+    // Tài khoản DEMO tạo sau (số điện thoại mới, khách) không có trong dữ liệu mẫu → đăng xuất.
+    const uid = demoDb.currentUserId();
+    if (uid && !demoDb.data.profiles.some((p) => p.id === uid)) {
+      await signOut();
+      return;
+    }
     queryClient.invalidateQueries();
-  }, [supa, demoDb]);
+  }, [supa, demoDb, signOut]);
 
   const value: ApiContextValue = {
     mode: MODE,

@@ -75,7 +75,8 @@ export function ReferralCodeInput({ value, onChange, check, action, onAction, ac
               <Icon name="check" size={16} color={colors.good} strokeWidth={2.6} />
             </Pop>
             <T weight={600} size={13} lineHeight={18} color={colors.good} style={{ flex: 1 }}>
-              Mã của {check.ownerName}. Bạn nhận điểm sau khi báo giá thật chuyến đầu tiên.
+              Mã của {check.ownerName}
+              {check.ownerName.endsWith('.') ? '' : '.'} Bạn nhận điểm sau khi báo giá thật chuyến đầu tiên.
             </T>
           </View>
         ) : check.state === 'bad' ? (

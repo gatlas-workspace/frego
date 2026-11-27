@@ -10,8 +10,8 @@ export type PushNotifProps = {
 
 /** Thông báo đẩy của Frego (UiPushNotif). */
 export function PushNotif({
-  title = `Mã ${brand.welcomeCode} vừa được dùng cho chuyến Be`,
-  body = "Giá thật tiết kiệm được bao nhiêu? Bấm đánh giá để được cộng điểm.",
+  title = `Chuyến Be với mã ${brand.welcomeCode} thế nào?`,
+  body = "Bạn vừa mở app Be kèm mã. Báo giá thật để được cộng điểm.",
   time = "vừa xong",
   className = "",
 }: PushNotifProps) {

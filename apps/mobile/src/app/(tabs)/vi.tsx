@@ -5,8 +5,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Linking, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PROVIDER_ORDER, PROVIDERS, type ShopOfferView, type WalletView } from '@frego/core';
-import { Button, Card, CodeCard, EmptyState, ListCard, ListRow, Pill, T, UnderlineTabs, VoucherTicket } from '@/components/ui';
+import { PROVIDER_ORDER, PROVIDERS, type ShopOfferView, type WalletGiftView, type WalletView } from '@frego/core';
+import { Button, Card, CodeCard, EmptyState, ListCard, ListRow, Pill, T, UnderlineTabs } from '@/components/ui';
+import { GiftTicket } from '@/components/screens/wallet/GiftTicket';
 import { Rise } from '@/components/motion';
 import { BannerImage } from '@/components/screens/flow/BannerImage';
 import { EmptyCard, ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
@@ -24,12 +25,14 @@ export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const { svc, status } = useApi();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const [tab, setTab] = useState<WalletTab>(isTab(params.tab) ? params.tab : 'public');
+  // Chưa chọn tab: có mã tặng riêng thì mở "Tặng bạn", không thì "Công khai".
+  const [picked, setTab] = useState<WalletTab | null>(isTab(params.tab) ? params.tab : null);
   const [fit, setFit] = useState(false);
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: () => svc.getWallet() });
   const shop = useQuery({ queryKey: ['shopOffers'], queryFn: () => svc.shopOffers() });
   const me = useQuery({ queryKey: ['me'], queryFn: () => svc.getMe(), enabled: status === 'signedIn' });
   const w = wallet.data;
+  const tab: WalletTab = picked ?? (w && w.gifts.length === 0 ? 'public' : 'gift');
   const tabs = [
     { key: 'gift' as const, label: 'Tặng bạn', count: w?.gifts.length },
     { key: 'shop' as const, label: 'Tại quán', count: shop.data?.length },
@@ -123,6 +126,8 @@ function PublicTab({ data, fit, onToggleFit }: { data: WalletView; fit: boolean;
   );
 }
 
+const openGift = (g: WalletGiftView) => router.push(g.link);
+
 function GiftTab({ data, onPublic }: { data: WalletView; onPublic: () => void }) {
   return (
     <View style={{ gap: 12 }}>
@@ -133,7 +138,7 @@ function GiftTab({ data, onPublic }: { data: WalletView; onPublic: () => void })
         <View accessibilityRole="list" style={{ gap: 12 }}>
           {data.gifts.map((g, i) => (
             <Rise key={g.id} index={i}>
-              <VoucherTicket {...g} lineIcon="spark" onPress={() => router.push(g.link)} />
+              <GiftTicket gift={g} onPress={openGift} />
             </Rise>
           ))}
         </View>

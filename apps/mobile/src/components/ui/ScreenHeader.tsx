@@ -3,7 +3,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from './BackButton';
 import { T } from './Text';
-import { layout } from '@/theme/tokens';
+import { colors, layout } from '@/theme/tokens';
 
 export interface ScreenHeaderProps {
   /** Tiêu đề màn 20/800 (role header). Bỏ trống khi chỉ có nút quay lại (Đăng nhập, Xác nhận). */
@@ -36,20 +36,22 @@ export function ScreenHeader({ title, backLabel, onBack, hideBack, children, rig
         {
           flexDirection: 'row',
           alignItems: start ? 'flex-start' : 'center',
-          gap: 6,
+          gap: 10,
           paddingTop: Math.max(insets.top + 4, layout.headerTop),
           paddingRight: 16,
-          paddingBottom: start ? 12 : 10,
-          paddingLeft: 8,
+          paddingBottom: start ? 12 : 12,
+          paddingLeft: 16,
+          // UI v3: màn có tiêu đề dùng thanh đầu trắng, kẻ mảnh phía dưới; màn chỉ có nút quay lại (Đăng nhập…) giữ trong suốt.
+          ...(title ? { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line } : null),
         },
         style,
       ]}
     >
-      {hideBack ? null : <BackButton onPress={onBack} accessibilityLabel={backLabel} style={start ? { marginTop: 14 } : undefined} />}
+      {hideBack ? null : <BackButton variant="soft" onPress={onBack} accessibilityLabel={backLabel} style={start ? { marginTop: 14 } : undefined} />}
       {children ?? (
         <View style={{ flex: 1, minWidth: 0 }}>
           {title ? (
-            <T variant="screenTitle" accessibilityRole="header">
+            <T variant="screenTitle" size={18} lineHeight={24} accessibilityRole="header" numberOfLines={1}>
               {title}
             </T>
           ) : null}

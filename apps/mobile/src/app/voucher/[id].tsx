@@ -5,7 +5,6 @@ import { ScrollView, View } from 'react-native';
 import type { VoucherDetailView } from '@frego/core';
 import { BottomBar, Button, Card, Icon, ScreenHeader, SectionTitle, T } from '@/components/ui';
 import { AreaMap } from '@/components/screens/wallet/AreaMap';
-import { CodeBox } from '@/components/screens/wallet/CodeBox';
 import { BulletList, IconList } from '@/components/screens/wallet/DetailList';
 import { EmptyCard, ErrorState, LoadingState } from '@/components/screens/wallet/QueryState';
 import { TextLink } from '@/components/screens/wallet/TextLink';
@@ -59,15 +58,13 @@ export default function VoucherDetailScreen() {
               amountText={d.amountText}
               serviceText={d.serviceText}
               expiresText={d.expiresText}
+              providerId={d.voucher.providerId}
+              vehicleClass={d.voucher.vehicleClass}
+              code={d.voucher.code}
             />
-
-            <Card gap={10}>
-              <SectionTitle text="Mã riêng của bạn" />
-              <CodeBox code={d.voucher.code} />
-              <T size={13} lineHeight={20} color={colors.muted}>
-                Mã chỉ dùng được 1 lần, cho tài khoản của bạn.
-              </T>
-            </Card>
+            <T size={13} lineHeight={20} color={colors.muted} style={{ paddingHorizontal: 4, marginTop: -4 }}>
+              Mã chỉ dùng được 1 lần, cho tài khoản của bạn.
+            </T>
 
             {d.reasons.length ? (
               <Card gap={10}>

@@ -48,7 +48,10 @@ export interface RecordTripArgs {
 export interface Rpcs {
   /** Ghi lần so giá. Ưu đãi chiến dịch chưa nhận ("cp:") được phát mã riêng cho người dùng. */
   record_trip: { args: RecordTripArgs; result: Trip };
-  /** Hãng báo mã đã được dùng (DEMO: giả lập sau khi mở app hãng). */
+  /**
+   * Ghi nhận chuyến sau khi mở app hãng kèm mã và nhắc báo giá (DEMO: giả lập sau khi mở app hãng).
+   * Frego không biết mã có thật sự được dùng (chưa có API đối tác): thông báo không được nói "đã được dùng".
+   */
   mark_code_used: { args: { tripId: string }; result: { trip: Trip; notification: AppNotification | null } };
   report_price: {
     args: { tripId: string; verdict?: PriceVerdict; paidAmount?: number };

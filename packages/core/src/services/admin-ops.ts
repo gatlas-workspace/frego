@@ -79,7 +79,7 @@ export const NOTIFICATION_TYPES: { key: NotifPrefKey; title: string; trigger: st
   { key: 'gift', title: 'Voucher tặng riêng', trigger: 'Doanh nghiệp tặng mã cho người hay đến gần quán', mode: 'auto' },
   { key: 'card', title: 'Mã mới hợp thẻ, ví', trigger: 'Kho mã có mã mới khớp thẻ, ví người dùng đã lưu', mode: 'auto' },
   { key: 'expire', title: 'Voucher sắp hết hạn', trigger: 'Còn 3 ngày, mã vẫn nằm trong Ví', mode: 'auto' },
-  { key: 'report', title: 'Nhắc báo giá sau chuyến', trigger: 'Hãng ghi nhận mã đã dùng', mode: 'auto' },
+  { key: 'report', title: 'Nhắc báo giá sau chuyến', trigger: 'Sau khi mở app hãng kèm mã', mode: 'auto' },
   { key: 'points', title: 'Điểm thưởng', trigger: 'Được cộng điểm hoặc đủ điểm đổi quà', mode: 'auto' },
   {
     key: 'promo',

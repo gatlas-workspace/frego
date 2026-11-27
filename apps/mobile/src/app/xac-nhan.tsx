@@ -31,12 +31,12 @@ export default function XacNhanScreen() {
   const [welcomePhone, setWelcomePhone] = useState<string | null>(null);
   const otpRef = useRef<TextInputInstance | null>(null);
 
-  const submit = async () => {
+  const submit = async (input: string = code) => {
     if (verifying) return;
     setVerifying(true);
     setError(null);
     try {
-      const res = await verifyOtp(code);
+      const res = await verifyOtp(input);
       if (!res.ok) {
         setError(res.error);
         otpRef.current?.focus();
@@ -81,16 +81,18 @@ export default function XacNhanScreen() {
             onChange={(v) => {
               setCode(v);
               if (error) setError(null);
+              // Đủ 6 số thì tự xác nhận (như các app gọi xe), không cần bấm nút.
+              if (v.length === CODE_LENGTH && v !== code) submit(v);
             }}
             length={CODE_LENGTH}
             error={!!error}
-            onSubmit={submit}
+            onSubmit={() => submit()}
             autoFocus
           />
           {error ? <InlineError text={error} /> : null}
         </View>
         <ResendRow />
-        <Button label={verifying ? 'Đang xác nhận…' : 'Xác nhận'} onPress={submit} disabled={verifying} />
+        <Button label={verifying ? 'Đang xác nhận…' : 'Xác nhận'} onPress={() => submit()} disabled={verifying} />
         <Button
           label="Đổi số điện thoại"
           variant="text"

@@ -330,6 +330,11 @@ export interface WalletGiftView {
   action: string;
   /** Điều hướng khi bấm */
   link: string;
+  /** Hãng và loại xe của mã (từ voucher) */
+  providerId: ProviderId;
+  vehicleClass: VehicleClass;
+  /** Còn ≤ 7 ngày: "Còn 3 ngày" / "Hết hạn hôm nay"; xa hơn: "HSD 30/11" */
+  endsText: string;
 }
 
 export interface PublicCodeCardView {
@@ -1441,7 +1446,7 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
       });
     },
 
-    /** DEMO: giả lập hãng báo mã đã dùng (thật: webhook đối tác / biên nhận email). */
+    /** DEMO: giả lập nhắc báo giá sau khi mở app hãng kèm mã (Frego không biết mã có được dùng hay không). */
     async simulateCodeUsed(tripId: string) {
       return db.rpc('mark_code_used', { tripId });
     },
@@ -1459,7 +1464,11 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
         serviceLine: providerId && vehicleClass ? serviceLongLabel(providerId, vehicleClass) : '',
         providerName: providerId ? PROVIDERS[providerId].name : '',
         estimateText: t.estimateLow !== null && t.estimateHigh !== null ? formatVndRange(t.estimateLow, t.estimateHigh) : '',
-        codeUsedChip: code ? `Mã ${code.code} vừa được dùng` : 'Chuyến vừa hoàn tất',
+        // Frego chỉ biết người dùng đã mở app hãng kèm mã, không biết mã có được dùng hay không.
+        codeUsedChip: [
+          `Chuyến${providerId ? ` ${PROVIDERS[providerId].name}` : ''} ngày ${formatDayMonth(t.openedAt ?? t.createdAt)}`,
+          ...(code ? [`mã ${code.code}`] : []),
+        ].join(' · '),
       };
     },
 
@@ -1481,6 +1490,7 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
       const campById = new Map(camps.map((c) => [c.id, c]));
       const bizById = new Map(bizs.map((b) => [b.id, b]));
       const pName = new Map(partners.map((p) => [p.id, p]));
+      const nowD = db.now();
       const gifts: WalletGiftView[] = vouchers
         .filter((v) => v.status === 'active')
         .sort((a, b) => (a.source === b.source ? 0 : a.source === 'sponsor' ? -1 : 1))
@@ -1500,9 +1510,15 @@ export function createUserService(db: Db, opts: UserServiceOptions = {}) {
             metaText: `HSD ${formatDate(v.expiresAt)}`,
             action: isSponsor ? 'Xem mã ›' : 'Dùng ›',
             link: isSponsor ? `/voucher/${v.id}` : '/tim-kiem',
+            providerId: v.providerId,
+            vehicleClass: v.vehicleClass,
+            endsText:
+              new Date(v.expiresAt).getTime() - nowD.getTime() <= 7 * 86_400_000
+                ? endsInText(v.expiresAt, nowD)
+                : `HSD ${formatDayMonth(v.expiresAt)}`,
           };
         });
-      const nowT = db.now().getTime();
+      const nowT = nowD.getTime();
       const publicCodes: PublicCodeCardView[] = codes.map((c) => {
         const partner = c.requiresPartnerId ? pName.get(c.requiresPartnerId) : null;
         const has = !!partner && linked.includes(partner.id);

@@ -87,7 +87,9 @@ begin
 
   r := public.mark_code_used(jsonb_build_object('tripId', v_trip->>'id'));
   assert r->'trip'->>'status' = 'code_used', 'mã đã dùng';
-  assert (r->'notification'->>'title') like 'Mã NHO% vừa được dùng cho chuyến Grab', 'có thông báo nhắc báo giá';
+  assert (r->'notification'->>'title') like 'Chuyến Grab với mã NHO% thế nào?', 'có thông báo nhắc báo giá';
+  assert (r->'notification'->>'title') not like '%được dùng%', 'không nói mã đã được dùng';
+  assert (r->'notification'->>'link') = '/bao-gia/' || (v_trip->>'id'), 'bấm mở màn báo giá';
   assert (select saved_amount from public.profiles) = 95000, 'cộng tiền đã tiết kiệm';
   r := public.report_price(jsonb_build_object('tripId', v_trip->>'id', 'paidAmount', 90000));
   assert (r->>'points_awarded')::int = 0 and r->>'held' like '%lệch hơn 30%%', 'lệch quá 30% thì giữ điểm';

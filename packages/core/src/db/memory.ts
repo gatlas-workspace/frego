@@ -69,6 +69,50 @@ export function normalizeReferralCode(code: string): string {
   return String(code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+/**
+ * Chỉ dùng cho DEMO: đăng nhập bằng số điện thoại (OTP giả). Như Supabase Auth, một số điện thoại là một tài khoản:
+ * số đã có hồ sơ (vd. +84909555123 của Minh Anh, hoặc số đã đăng ký DEMO trước đó) → dùng lại hồ sơ đó;
+ * số mới → tạo hồ sơ trống ngay lúc này giống trigger handle_new_user (20261122000400_auth.sql): profiles
+ * (giá trị mặc định của bảng, chưa điền Thông tin nên onboardedAt = null, mã giới thiệu tự sinh khi insert như
+ * trigger profiles_referral_code), consents và notification_prefs theo mặc định cột.
+ * Quà chào mừng vẫn do app gọi ensure_welcome_voucher sau khi đăng nhập, như bản thật.
+ */
+export async function demoSignUp(db: MemoryDb, phone: string): Promise<{ userId: string; created: boolean }> {
+  if (!phone) throw new Error('Cần số điện thoại');
+  const existing = db.data.profiles.find((p) => p.phone === phone);
+  if (existing) return { userId: existing.id, created: false };
+  const now = db.now().toISOString();
+  const p = await db.insert('profiles', {
+    phone,
+    displayName: '',
+    avatarUrl: null,
+    birthday: null,
+    interests: [],
+    vehiclePrefs: [],
+    points: 0,
+    savedAmount: 0,
+    savedCount: 0,
+    role: 'user',
+    adminRole: null,
+    status: 'active',
+    lockReason: null,
+    createdAt: now,
+    onboardedAt: null,
+  });
+  await db.insert('consents', { userId: p.id, location: true, shareData: false, personalized: false, updatedAt: now });
+  await db.insert('notification_prefs', {
+    userId: p.id,
+    gift: true,
+    card: true,
+    expire: true,
+    report: true,
+    points: true,
+    promo: false,
+    quiet: true,
+  });
+  return { userId: p.id, created: true };
+}
+
 function codePrefix(name: string): string {
   const words = stripDiacritics(name).split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] ?? 'FRE';
@@ -539,6 +583,8 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
       }
       let notification: AppNotification | null = null;
       if (prefsOf(u)?.report !== false) {
+        // Frego chỉ biết người dùng đã mở app hãng kèm mã (chưa có API đối tác): không nói mã "đã được dùng".
+        const pName = PROVIDERS[providerId].name;
         notification = pushNotification({
           userId: u,
           category: 'trip',
@@ -546,10 +592,10 @@ export function createMemoryDb(seed: Seed, opts: MemoryDbOptions = {}): MemoryDb
           icon: 'receipt',
           tone: 'tint',
           logo: providerId,
-          title: code
-            ? `Mã ${code.code} vừa được dùng cho chuyến ${PROVIDERS[providerId].name}`
-            : `Chuyến ${PROVIDERS[providerId].name} đã hoàn tất`,
-          body: 'Giá thật tiết kiệm được bao nhiêu? Bấm đánh giá để được cộng điểm.',
+          title: code ? `Chuyến ${pName} với mã ${code.code} thế nào?` : `Chuyến ${pName} thế nào?`,
+          body: code
+            ? `Bạn vừa mở app ${pName} kèm mã ${code.code}. Báo giá thật để được cộng điểm.`
+            : `Bạn vừa mở app ${pName}. Báo giá thật để được cộng điểm.`,
           cta: 'Báo giá ›',
           link: `/bao-gia/${trip.id}`,
         });

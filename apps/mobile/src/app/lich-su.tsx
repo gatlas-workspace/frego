@@ -9,7 +9,7 @@ import { EmptyCard, ErrorState, LoadingState } from '@/components/screens/wallet
 import { TripCard } from '@/components/screens/wallet/TripCard';
 import { Rise } from '@/components/motion';
 import { useApi } from '@/lib/api';
-import { colors, layout } from '@/theme/tokens';
+import { colors, layout, radius } from '@/theme/tokens';
 
 type Filter = 'all' | 'pending';
 
@@ -68,9 +68,11 @@ export default function HistoryScreen() {
             groups.map((g, gi) => (
               <Rise key={g.label} index={gi} style={{ gap: 10 }}>
                 <SectionTitle text={g.label} size="sm" />
-                {g.items.map((t) => (
-                  <TripCard key={t.id} trip={t} onReport={() => router.push(`/bao-gia/${t.id}`)} />
-                ))}
+                <View style={{ borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, overflow: 'hidden' }}>
+                  {g.items.map((t, i) => (
+                    <TripCard key={t.id} trip={t} first={i === 0} onReport={() => router.push(`/bao-gia/${t.id}`)} />
+                  ))}
+                </View>
               </Rise>
             ))
           )}

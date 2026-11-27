@@ -150,7 +150,8 @@ export default function TaiKhoanScreen() {
 
       <ListCard divider="lead" accessibilityLabel="Mục tài khoản">
         {menuRows(data)
-          .filter((r) => !guest || r.href !== '/thong-tin?tu=tai-khoan')
+          // Khách: chưa có hồ sơ, chưa liên kết được thẻ/ví (cần tài khoản để giữ liên kết).
+          .filter((r) => !guest || (r.href !== '/thong-tin?tu=tai-khoan' && r.href !== '/lien-ket'))
           .map((r) => (
           <ListRow
             key={r.title}

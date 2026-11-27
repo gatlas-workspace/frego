@@ -178,12 +178,12 @@ export function ListRow(props: ListRowProps) {
           paddingHorizontal: 16,
           borderRadius: radius.small,
           borderWidth: 1.5,
-          borderColor: colors.primary,
-          backgroundColor: pressed ? colors.primarySoft : colors.surface,
+          borderColor: colors.handle,
+          backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
           justifyContent: 'center',
         })}
       >
-        <T weight={700} size={14} lineHeight={18} color={colors.primary} numberOfLines={1}>
+        <T weight={800} size={14} lineHeight={18} color={colors.ink} numberOfLines={1}>
           {actionLabel}
         </T>
       </Pressable>
@@ -193,14 +193,14 @@ export function ListRow(props: ListRowProps) {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 4,
-          borderRadius: radius.pill,
-          paddingVertical: 6,
+          borderRadius: radius.small,
+          paddingVertical: 8,
           paddingHorizontal: 10,
-          backgroundColor: colors.primarySoft,
+          backgroundColor: colors.goodSoft,
         }}
       >
-        <Icon name="check" size={14} color={colors.primaryDeep} strokeWidth={2.2} />
-        <T weight={700} size={13} lineHeight={17} color={colors.primaryDeep} numberOfLines={1}>
+        <Icon name="check" size={14} color={colors.good} strokeWidth={2.4} />
+        <T weight={800} size={13} lineHeight={17} color={colors.good} numberOfLines={1}>
           {doneLabel}
         </T>
       </View>

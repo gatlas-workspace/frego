@@ -138,7 +138,7 @@ function HeroArt() {
 
       <div aria-hidden="true" className="absolute -left-10 top-[430px] w-[270px] [transform:rotate(-3deg)] max-[640px]:hidden">
         <PushNotif
-          title={`Mã ${brand.welcomeCode} vừa được dùng`}
+          title={`Chuyến Be với mã ${brand.welcomeCode} thế nào?`}
           body={`Chuyến Be xe máy tới Chợ Bến Thành. Chạm để báo giá, nhận ${POINTS_RULES.tap} điểm.`}
           time="vừa xong"
         />

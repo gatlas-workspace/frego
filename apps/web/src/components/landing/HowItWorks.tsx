@@ -63,16 +63,16 @@ export function HowItWorks() {
         <div className="mt-6 flex items-center gap-10 rounded-[28px] bg-app-surface px-8 py-7 shadow-app-ring max-[900px]:flex-col max-[900px]:items-stretch">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <h3 className="m-0 text-[21px] font-extrabold tracking-[-0.3px]">
-              Sau chuyến, {brand.name} báo khi mã được dùng
+              Sau chuyến, {brand.name} nhắc bạn báo giá
             </h3>
             <p className="m-0 text-base leading-[1.6] text-app-ink-2">
-              Bạn không cần quay lại app. Khi hãng ghi nhận mã, {brand.name} gửi thông báo. Chạm một lần để cho biết giá
+              Bạn không cần nhớ. Sau khi bạn mở app hãng kèm mã, {brand.name} gửi một thông báo nhắc. Chạm một lần để cho biết giá
               thật rẻ hơn, đúng khoảng hay đắt hơn ước tính, và nhận {POINTS_RULES.tap} điểm.
             </p>
           </div>
           <div aria-hidden="true" className="min-w-0 flex-[0_0_380px] max-[900px]:w-full max-[900px]:flex-none">
             <PushNotif
-              title={`Mã ${brand.welcomeCode} vừa được dùng cho chuyến Be`}
+              title={`Chuyến Be với mã ${brand.welcomeCode} thế nào?`}
               body={`Giá thật so với ước tính ${formatVndRange(31000, 36000)}? Chạm để trả lời, nhận ${POINTS_RULES.tap} điểm.`}
               time="08:52"
             />

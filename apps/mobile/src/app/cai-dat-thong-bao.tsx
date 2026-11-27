@@ -18,7 +18,7 @@ const VOUCHER_ROWS: Row[] = [
   { key: 'expire', title: 'Voucher sắp hết hạn', desc: 'Nhắc trước 3 ngày với mã còn trong Ví.' },
 ];
 const TRIP_ROWS: Row[] = [
-  { key: 'report', title: 'Nhắc báo giá sau chuyến', desc: 'Khi hãng ghi nhận mã đã dùng, để bạn báo giá và nhận điểm.' },
+  { key: 'report', title: 'Nhắc báo giá sau chuyến', desc: 'Sau khi bạn mở app hãng kèm mã, để bạn báo giá và nhận điểm.' },
   { key: 'points', title: 'Điểm thưởng', desc: 'Khi được cộng điểm hoặc đủ điểm đổi voucher.' },
 ];
 const OTHER_ROWS: Row[] = [

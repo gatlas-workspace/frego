@@ -74,7 +74,7 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     expect(suv.rows.filter((r) => r.priced).length).toBe(1);
   });
 
-  it('mở app hãng → mã được dùng → báo giá → cộng điểm', async () => {
+  it('mở app hãng → nhắc báo giá → báo giá → cộng điểm', async () => {
     const { svc } = setup();
     const plan = await svc.planTrip('ben-thanh');
     const cmp = await svc.compare(plan, plan.selection, 'bike');
@@ -86,7 +86,14 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     expect(open.step1).toEqual(['Be chưa tự điền điểm đến,', ' địa chỉ đã được chép sẵn để bạn dán.']);
     expect(open.destAddress).toBe('Chợ Bến Thành, Đường Lê Lợi, phường Bến Thành');
     const used = await svc.simulateCodeUsed(open.trip.id);
-    expect(used.notification?.title).toBe('Mã FREGO20 vừa được dùng cho chuyến Be');
+    // Frego không biết mã có được dùng: chỉ nói người dùng đã mở app hãng kèm mã.
+    expect(used.notification?.title).toBe('Chuyến Be với mã FREGO20 thế nào?');
+    expect(used.notification?.body).toBe('Bạn vừa mở app Be kèm mã FREGO20. Báo giá thật để được cộng điểm.');
+    expect(used.notification?.link).toBe(`/bao-gia/${open.trip.id}`);
+    expect(used.notification?.kind).toBe('code_used');
+    expect(used.notification?.title).not.toMatch(/được dùng/);
+    const view = await svc.getTrip(open.trip.id);
+    expect(view?.codeUsedChip).toBe('Chuyến Be ngày 22/11 · mã FREGO20');
     const r1 = await svc.reportPrice(open.trip.id, { verdict: 'within' });
     expect(r1.pointsAwarded).toBe(10);
     expect(r1.points).toBe(1260);

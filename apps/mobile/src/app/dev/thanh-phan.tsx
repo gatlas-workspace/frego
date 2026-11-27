@@ -156,6 +156,9 @@ const GIFT: WalletGiftView = {
   metaText: 'HSD 15/12/2026',
   action: 'Xem mã ›',
   link: '/voucher/g1',
+  providerId: 'gsm',
+  vehicleClass: 'car4',
+  endsText: 'HSD 15/12',
 };
 const ATTACH: AttachItemView = {
   refId: 'uv:1',
@@ -437,12 +440,12 @@ export default function ThanhPhan() {
           />
         </ListCard>
         <ListCard divider="lead">
-          <ListRow lead="logo" logo="be" title="Be" sub="Biết khi mã được dùng để nhắc báo giá" subWrap trail="done" />
+          <ListRow lead="logo" logo="be" title="Be" sub="Nhắc báo giá sau khi bạn mở app kèm mã" subWrap trail="done" />
           <ListRow
             lead="logo"
             logo="grab"
             title="Grab"
-            sub="Biết khi mã được dùng để nhắc báo giá"
+            sub="Nhắc báo giá sau khi bạn mở app kèm mã"
             subWrap
             trail="action"
             onAction={() => {}}
@@ -451,7 +454,7 @@ export default function ThanhPhan() {
             lead="logo"
             logo="gsm"
             title="Green SM"
-            sub="Biết khi mã được dùng để nhắc báo giá"
+            sub="Nhắc báo giá sau khi bạn mở app kèm mã"
             subWrap
             trail="action"
             onAction={() => {}}
@@ -653,7 +656,7 @@ export default function ThanhPhan() {
         <NotifItem
           icon="receipt"
           logo="be"
-          title="Mã FREGO20 đã được dùng cho chuyến Be"
+          title="Chuyến Be với mã FREGO20 thế nào?"
           body="Giá thật tiết kiệm được bao nhiêu? Báo giá để được cộng điểm."
           metaText="18:05 · Chuyến đi"
           cta="Báo giá ›"
@@ -704,7 +707,7 @@ export default function ThanhPhan() {
       <Section title="Thông báo đẩy · UiPushNotif" bare>
         <View style={{ backgroundColor: colors.pushBg, borderRadius: 24, padding: 16 }}>
           <PushNotif
-            title="Mã FREGO20 vừa được dùng cho chuyến Be"
+            title="Chuyến Be với mã FREGO20 thế nào?"
             body="Giá thật tiết kiệm được bao nhiêu? Bấm đánh giá để được cộng điểm."
           />
         </View>

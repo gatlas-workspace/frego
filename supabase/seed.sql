@@ -290,7 +290,7 @@ on conflict (id) do update set user_id = excluded.user_id, delta = excluded.delt
 
 -- notifications (5)
 insert into public.notifications (id, user_id, category, kind, icon, tone, logo, title, body, cta, link, created_at, read_at) values
-  ('nt-used', '00000000-0000-4000-8000-000000000001', 'trip', 'code_used', 'receipt', 'tint', 'be', 'Mã FREGO20 đã được dùng cho chuyến Be', 'Giá thật tiết kiệm được bao nhiêu? Báo giá để được cộng điểm.', 'Báo giá ›', '/bao-gia/trip-today', '2026-11-22T11:05:00.000Z', null),
+  ('nt-used', '00000000-0000-4000-8000-000000000001', 'trip', 'code_used', 'receipt', 'tint', 'be', 'Chuyến Be với mã FREGO20 thế nào?', 'Bạn vừa mở app Be kèm mã FREGO20. Báo giá thật để được cộng điểm.', 'Báo giá ›', '/bao-gia/trip-today', '2026-11-22T11:05:00.000Z', null),
   ('nt-gift', '00000000-0000-4000-8000-000000000001', 'voucher', 'gift', 'gift', 'deal', 'cafe', 'Cà phê Mây tặng bạn voucher −20.000đ', 'Dùng cho chuyến Grab ô tô đến khu Chợ Bến Thành, hạn 30/11.', 'Xem mã ›', '/voucher/uv-may7k2q', '2026-11-22T08:20:00.000Z', null),
   ('nt-card', '00000000-0000-4000-8000-000000000001', 'voucher', 'card_match', 'card2', 'deal', 'grab', 'Mã mới hợp thẻ VPBank của bạn', 'VPBTRANSPORT giảm 15.000đ cho chuyến GrabBike, GrabCar từ 50.000đ.', 'Chi tiết ›', '/ma/pc-vpb', '2026-11-22T02:12:00.000Z', null),
   ('nt-points', '00000000-0000-4000-8000-000000000001', 'trip', 'points', 'sparkplus', 'tint', 'frego', 'Bạn được cộng 50 điểm', 'Cảm ơn bạn đã báo giá chuyến Grab ô tô Nhà → Công ty. Bạn đang có 1.250 điểm.', 'Đổi voucher ›', '/diem-thuong', '2026-11-21T01:52:00.000Z', '2026-11-21T02:00:00.000Z'),

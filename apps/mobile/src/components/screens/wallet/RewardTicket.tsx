@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import type { RewardView } from '@frego/core';
 import { Button, Chip, DashLine, T, VehicleTile } from '@/components/ui';
-import { colors, shadow } from '@/theme/tokens';
+import { colors, radius } from '@/theme/tokens';
 
 export interface RewardTicketProps {
   reward: RewardView;
@@ -19,8 +19,8 @@ export function RewardTicket({ reward: r, redeemed, busy, onRedeem }: RewardTick
   );
   const canRedeem = !redeemed && r.canRedeem;
   return (
-    <View style={{ borderRadius: 22, backgroundColor: colors.surface, boxShadow: shadow.card }}>
-      <View style={{ flexDirection: 'row', borderRadius: 22, overflow: 'hidden', backgroundColor: colors.surface }}>
+    <View style={{ borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+      <View style={{ flexDirection: 'row', borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.surface }}>
         <View
           accessible
           accessibilityLabel={`Voucher ${r.serviceText} ${r.amountText}`}
@@ -43,9 +43,6 @@ export function RewardTicket({ reward: r, redeemed, busy, onRedeem }: RewardTick
               {r.amountText}
             </T>
           </View>
-          <T weight={600} size={12} lineHeight={16} color={colors.ink2} align="center">
-            {r.serviceText}
-          </T>
         </View>
         <View style={{ width: 2, alignSelf: 'stretch' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <DashLine style={{ flex: 1 }} />
