@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { brand } from '@frego/core';
 import { BizMark, Button, Callout, cx, Divider, FregoLogo, FregoMark, Input, WebIcon } from '@/components/web';
 import { MODE } from '@/lib/server/data';
-import { demoSignIn } from './actions';
+import { demoSignIn, passwordSignIn } from './actions';
 
 export const metadata: Metadata = { title: 'Đăng nhập' };
 
@@ -42,8 +42,17 @@ function Choice({ role, preselected }: { role: Role; preselected: boolean }) {
   );
 }
 
+const ERRORS: Record<string, string> = {
+  thieu: 'Nhập email và mật khẩu.',
+  sai: 'Email hoặc mật khẩu chưa đúng.',
+  quyen: 'Tài khoản này chưa thuộc doanh nghiệp nào được duyệt, hoặc không có quyền quản trị.',
+};
+
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const wanted = roleFromParam((await searchParams)['vai-tro']);
+  const params = await searchParams;
+  const wanted = roleFromParam(params['vai-tro']);
+  const errorKey = Array.isArray(params.loi) ? params.loi[0] : params.loi;
+  const error = errorKey ? ERRORS[errorKey] : null;
   return (
     <div className="flex min-h-screen flex-col bg-white text-ink">
       <header className="px-6 py-5 max-[600px]:px-4">
@@ -74,16 +83,21 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               </form>
             </>
           ) : (
-            <form className="flex flex-col gap-3" aria-describedby="dang-nhap-supabase">
-              <Input label="Email công việc" id="dn-email" name="email" type="email" autoComplete="email" placeholder="ten@cuahang.vn" />
-              <Input label="Mật khẩu" id="dn-mat-khau" name="password" type="password" autoComplete="current-password" />
-              <Button type="submit" variant="primary" block disabled>
+            <form action={passwordSignIn} className="flex flex-col gap-3" aria-describedby="dang-nhap-supabase">
+              {error ? (
+                <Callout tone="red" icon="info" role="alert">
+                  {error}
+                </Callout>
+              ) : null}
+              <Input label="Email công việc" id="dn-email" name="email" type="email" autoComplete="email" placeholder="ten@cuahang.vn" required />
+              <Input label="Mật khẩu" id="dn-mat-khau" name="password" type="password" autoComplete="current-password" required />
+              <Button type="submit" variant="primary" block>
                 Đăng nhập
               </Button>
               <Callout tone="grey" icon="info">
                 <span id="dang-nhap-supabase">
-                  Đăng nhập bằng email được cấu hình qua Supabase Auth (mật khẩu hoặc mã OTP gửi về email). Tài khoản doanh
-                  nghiệp được tạo sau khi Frego duyệt hồ sơ đăng ký.
+                  Tài khoản doanh nghiệp được tạo khi gửi hồ sơ đăng ký; vào được cổng sau khi Frego duyệt. Tài khoản quản
+                  trị do Frego cấp.
                 </span>
               </Callout>
             </form>

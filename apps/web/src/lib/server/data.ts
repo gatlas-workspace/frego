@@ -53,22 +53,26 @@ export async function getDb(): Promise<Db> {
     base.setUser(userId);
     return base;
   }
+  const db = createSupabaseDb(await supabaseServerClient());
+  await db.refreshUser();
+  return db;
+}
+
+/** Supabase client phía server, đọc/ghi cookie phiên (chỉ dùng khi MODE === 'supabase'). */
+export async function supabaseServerClient() {
   const store = await cookies();
-  const client = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (list) => {
         try {
           list.forEach(({ name, value, options }) => store.set(name, value, options));
         } catch {
-          /* Server Component: bỏ qua, middleware sẽ làm mới phiên */
+          /* Server Component: bỏ qua, proxy sẽ làm mới phiên */
         }
       },
     },
   });
-  const db = createSupabaseDb(client);
-  await db.refreshUser();
-  return db;
 }
 
 /** Phiên hiện tại hoặc null. */
