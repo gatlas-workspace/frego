@@ -46,9 +46,7 @@ export function useStartTrip() {
       run(deal.campaignId, async () => {
         const plan = await start(deal.destPlaceId, { preferredCampaignId: deal.campaignId });
         // Mở đúng tab loại xe của mã tài trợ (ưu đãi chưa nhận, hoặc mã cùng quán đã có trong ví).
-        const match =
-          plan.evaluation.eligible.find((e) => e.offer.refId === `cp:${deal.campaignId}`) ??
-          plan.evaluation.eligible.find((e) => e.offer.source === 'sponsor' && e.offer.label === deal.brand);
+        const match = plan.evaluation.eligible.find((e) => e.offer.campaignId === deal.campaignId);
         if (match) setVehicleClass(parseServiceKey(match.service).vehicleClass);
         router.push('/chuyen/so-gia');
       }),

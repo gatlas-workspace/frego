@@ -59,6 +59,7 @@ export const SearchField = forwardRef<TextInputInstance, SearchFieldProps>(funct
           fontSize: 16,
           color: colors.ink,
           outlineWidth: 0,
+          outlineStyle: 'none',
         }}
       />
       {canClear ? (

@@ -418,6 +418,7 @@ export function createUserService(db: Db) {
           refId: `uv:${v.id}`,
           source: 'sponsor',
           inWallet: true,
+          campaignId: c.id,
           code: v.code,
           label: c.business.name,
           logo: c.business.category,
@@ -441,6 +442,7 @@ export function createUserService(db: Db) {
           refId: `uv:${v.id}`,
           source: 'frego',
           inWallet: true,
+          campaignId: null,
           code: v.code,
           label: v.code,
           logo: 'frego',
@@ -467,6 +469,7 @@ export function createUserService(db: Db) {
         refId: `cp:${c.id}`,
         source: 'sponsor',
         inWallet: false,
+        campaignId: c.id,
         code: '',
         label: c.business.name,
         logo: c.business.category,
@@ -490,6 +493,7 @@ export function createUserService(db: Db) {
         refId: `pc:${p.id}`,
         source: 'public',
         inWallet: false,
+        campaignId: null,
         code: p.code,
         label: p.code,
         logo: p.providerId,
@@ -689,11 +693,24 @@ export function createUserService(db: Db) {
     async searchPlaces(query: string): Promise<PlaceView[]> {
       const q = normalize(query);
       if (!q) return [];
+      const tokens = q.split(/\s+/).filter(Boolean);
+      const last = tokens[tokens.length - 1];
       const [all, origin] = await Promise.all([db.list('places'), currentOrigin()]);
-      const hits = all
+      // Khớp cả cụm trước; rồi khớp từng từ (từ cuối là từ đang gõ, phải khớp đầu một từ trong tên/địa chỉ).
+      const scored = all
         .filter((p) => !['nha-minh-anh', 'cty-minh-anh'].includes(p.id))
-        .filter((p) => normalize(p.name).includes(q) || normalize(p.address).includes(q));
-      return toPlaceViews(hits.slice(0, 8), origin);
+        .map((p) => {
+          const name = normalize(p.name);
+          const text = `${name} ${normalize(p.address)}`;
+          const words = text.split(/[\s,]+/);
+          const phrase = name.includes(q) ? 1 : 0;
+          const hits = tokens.filter((t) => words.some((w) => w.startsWith(t))).length;
+          const lastOk = words.some((w) => w.startsWith(last));
+          return { p, phrase, ratio: hits / tokens.length, ok: phrase === 1 || (lastOk && hits / tokens.length >= 0.5) };
+        })
+        .filter((x) => x.ok)
+        .sort((a, b) => b.phrase - a.phrase || b.ratio - a.ratio);
+      return toPlaceViews(scored.slice(0, 8).map((x) => x.p), origin);
     },
 
     async currentOriginLabel(): Promise<string> {
@@ -730,9 +747,7 @@ export function createUserService(db: Db) {
       const evaluation = evaluateOffers(await buildOffers(), ctx);
       const selection: Selection = { ...evaluation.autoSelection };
       if (opts.preferredCampaignId) {
-        const pref = evaluation.eligible.find(
-          (e) => e.offer.refId === `cp:${opts.preferredCampaignId}` || e.offer.label === opts.preferredCampaignId,
-        );
+        const pref = evaluation.eligible.find((e) => e.offer.campaignId === opts.preferredCampaignId);
         if (pref) selection[pref.service] = pref.offer.refId;
       }
       const originName = origin.placeId ? (await db.get('places', origin.placeId))?.name ?? origin.label : origin.label;
@@ -783,7 +798,10 @@ export function createUserService(db: Db) {
     async compare(plan: TripPlan, selection: Selection, vehicleClass: VehicleClass): Promise<ComparisonView> {
       const ctx = await tripContext(plan);
       const { rows, insight } = comparePrices(ctx, vehicleClass, plan.evaluation, selection);
-      const chosen = selectedOffers(selection, plan.evaluation);
+      const order = { frego: 0, sponsor: 1, public: 2 } as const;
+      const chosen = selectedOffers(selection, plan.evaluation).sort(
+        (a, b) => order[a.offer.source] - order[b.offer.source] || b.discount - a.discount,
+      );
       return {
         tabs: VEHICLE_TABS,
         vehicleClass,

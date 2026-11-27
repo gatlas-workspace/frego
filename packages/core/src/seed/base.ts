@@ -41,9 +41,9 @@ export const places: Place[] = [
   { id: 'landmark81', name: 'Landmark 81', address: '720A Điện Biên Phủ, Bình Thạnh', district: 'Bình Thạnh', lat: 10.7949, lng: 106.7219 },
   { id: 'ben-thanh', name: 'Chợ Bến Thành', address: 'Đường Lê Lợi, phường Bến Thành', district: 'Quận 1', lat: 10.7725, lng: 106.698 },
   { id: 'ben-thanh-bac', name: 'Chợ Bến Thành, cửa Bắc', address: 'Đường Lê Thánh Tôn, phường Bến Thành', district: 'Quận 1', lat: 10.7731, lng: 106.6979 },
-  { id: 'cho-dem-ben-thanh', name: 'Chợ đêm Bến Thành', address: 'Đường Phan Bội Châu, phường Bến Thành', district: 'Quận 1', lat: 10.7722, lng: 106.6987 },
-  { id: 'metro-ben-thanh', name: 'Ga metro Bến Thành', address: 'Đường Lê Lợi, phường Bến Thành', district: 'Quận 1', lat: 10.7716, lng: 106.6991 },
-  { id: 'tan-son-nhat', name: 'Sân bay Tân Sơn Nhất', address: 'Đường Trường Sơn, Tân Bình', district: 'Tân Bình', lat: 10.8188, lng: 106.6519, isAirport: true },
+  { id: 'cho-dem-ben-thanh', name: 'Chợ đêm Bến Thành', address: 'Đường Phan Bội Châu, phường Bến Thành', district: 'Quận 1', lat: 10.7712, lng: 106.6975 },
+  { id: 'metro-ben-thanh', name: 'Ga metro Bến Thành', address: 'Đường Lê Lợi, phường Bến Thành', district: 'Quận 1', lat: 10.7705, lng: 106.6935 },
+  { id: 'tan-son-nhat', name: 'Sân bay Tân Sơn Nhất', address: 'Đường Trường Sơn', district: 'Tân Bình', lat: 10.8188, lng: 106.6519, isAirport: true },
   { id: 'nguyen-hue', name: 'Phố đi bộ Nguyễn Huệ', address: 'Phường Sài Gòn', district: 'Quận 1', lat: 10.7741, lng: 106.7038 },
   { id: 'ho-con-rua', name: 'Hồ Con Rùa', address: 'Công trường Quốc Tế, Quận 3', district: 'Quận 3', lat: 10.7826, lng: 106.6959 },
   { id: 'cho-tan-dinh', name: 'Chợ Tân Định', address: 'Đường Hai Bà Trưng, Quận 1', district: 'Quận 1', lat: 10.7891, lng: 106.6905 },
@@ -193,8 +193,8 @@ export const savedPlaces: SavedPlace[] = [
 
 export const recentSearches: RecentSearch[] = [
   { id: 'rs-1', userId: DEMO_USER_ID, placeId: 'ben-thanh', searchedAt: vn('2026-11-22 17:38') },
-  { id: 'rs-2', userId: DEMO_USER_ID, placeId: 'tan-son-nhat', searchedAt: vn('2026-11-19 06:10') },
-  { id: 'rs-3', userId: DEMO_USER_ID, placeId: 'nguyen-hue', searchedAt: vn('2026-11-21 19:00') },
+  { id: 'rs-2', userId: DEMO_USER_ID, placeId: 'tan-son-nhat', searchedAt: vn('2026-11-21 20:10') },
+  { id: 'rs-3', userId: DEMO_USER_ID, placeId: 'nguyen-hue', searchedAt: vn('2026-11-20 19:00') },
 ];
 
 /* ───────────── Đối tác liên kết ───────────── */

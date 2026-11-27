@@ -59,6 +59,7 @@ describe('luồng chính khớp thiết kế: Landmark 81 → Chợ Bến Thành
     expect(bike.rows[1].voucherText).toBe('Đã gắn mã Quán bún Ngõ Nhỏ, giảm 10.000đ');
     expect(bike.rows[2].autoNote).toBe('Green SM đang tự giảm 25%, không cần mã');
     expect(bike.insight).toBeNull();
+    expect(bike.attachedLine).toBe('FREGO10 · Cà phê Mây · Quán bún Ngõ Nhỏ');
     expect(bike.peakNote).toBe('17:45 là giờ cao điểm, khoảng giá đã nới rộng. Giá cuối cùng do app hãng hiển thị.');
 
     const car = await svc.compare(plan, plan.selection, 'car4');
@@ -115,8 +116,23 @@ describe('màn khác', () => {
     expect(home.banner?.title).toBe('Giảm 10.000đ chuyến Be xe máy');
     expect(home.recent.map((r) => [r.name, r.voucherChip])).toEqual([
       ['Chợ Bến Thành', '3 voucher'],
+      ['Sân bay Tân Sơn Nhất', ''],
+    ]);
+    const search = await svc.searchPlaces('Chợ Bến');
+    expect(search.map((r) => [r.name, r.distanceText, r.voucherChip])).toEqual([
+      ['Chợ Bến Thành', '5,8 km', '3 voucher'],
+      ['Chợ Bến Thành, cửa Bắc', '5,7 km', '3 voucher'],
+      ['Chợ đêm Bến Thành', '5,8 km', '2 voucher'],
+      ['Ga metro Bến Thành', '5,9 km', ''],
+    ]);
+    const recent = await svc.recentSearches();
+    expect(recent.map((r) => [r.name, r.voucherChip])).toEqual([
+      ['Chợ Bến Thành', '3 voucher'],
+      ['Sân bay Tân Sơn Nhất', ''],
       ['Phố đi bộ Nguyễn Huệ', '1 voucher'],
     ]);
+    const deal = await svc.planTrip(home.deals[0].destPlaceId, { preferredCampaignId: home.deals[0].campaignId });
+    expect(deal.selection['grab-car4']).toBe('uv:uv-may7k2q');
     expect(home.deals[0]).toMatchObject({ brand: 'Cà phê Mây', serviceText: 'Mã Grab ô tô', amountText: '−20.000đ', area: 'Gần Chợ Bến Thành' });
     expect(home.unreadCount).toBe(3);
 

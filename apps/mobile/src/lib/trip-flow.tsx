@@ -36,7 +36,7 @@ export function TripFlowProvider({ children }: { children: ReactNode }) {
       setOpenView(null);
       // Bấm thẻ tài trợ: mở sẵn tab loại xe của mã đó.
       const pref = opts?.preferredCampaignId
-        ? p.evaluation.eligible.find((e) => e.offer.refId === `cp:${opts.preferredCampaignId}` || e.offer.refId.startsWith('uv:'))
+        ? p.evaluation.eligible.find((e) => e.offer.campaignId === opts.preferredCampaignId)
         : null;
       setVehicleClass(pref ? (pref.service.split('-')[1] as VehicleClass) : 'bike');
       return p;

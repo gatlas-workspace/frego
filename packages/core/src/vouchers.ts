@@ -29,6 +29,8 @@ export interface CodeOffer {
   source: CodeSource;
   /** Đã nằm trong ví người dùng (tặng riêng / FREGO10) */
   inWallet: boolean;
+  /** Chiến dịch tài trợ (cả mã đã nhận trong ví lẫn ưu đãi chưa nhận) */
+  campaignId: string | null;
   code: string;
   /** Tên hiện trên vé: tên quán hoặc mã */
   label: string;
