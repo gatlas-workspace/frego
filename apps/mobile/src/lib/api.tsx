@@ -29,6 +29,8 @@ export const MODE: 'demo' | 'supabase' = SUPABASE_URL && SUPABASE_ANON_KEY ? 'su
 
 const DEMO_DATA_KEY = 'frego.demo.data.v1';
 const DEMO_SESSION_KEY = 'frego.demo.session.v1';
+/** DEMO: tài khoản khách ("Xem voucher trước, đăng nhập sau"). */
+const DEMO_GUEST_ID = '00000000-0000-4000-8000-00000000ff01';
 
 type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -164,8 +166,41 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       await supa.client.auth.signInAnonymously();
       await supa.refreshUser();
     } else {
-      demoDb.setUser(DEMO_USER_ID);
-      await AsyncStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({ userId: DEMO_USER_ID, guest: true }));
+      // DEMO: khách có hồ sơ trống riêng (không thấy dữ liệu của tài khoản mẫu), vẫn xem được ưu đãi, mã công khai, so giá.
+      const now = demoDb.now().toISOString();
+      if (!(await demoDb.get('profiles', DEMO_GUEST_ID))) {
+        await demoDb.insert('profiles', {
+          id: DEMO_GUEST_ID,
+          phone: '',
+          displayName: '',
+          avatarUrl: null,
+          birthday: null,
+          interests: [],
+          vehiclePrefs: [],
+          points: 0,
+          savedAmount: 0,
+          savedCount: 0,
+          role: 'user',
+          adminRole: null,
+          status: 'active',
+          lockReason: null,
+          createdAt: now,
+          onboardedAt: null,
+        });
+        await demoDb.insert('consents', { userId: DEMO_GUEST_ID, location: true, shareData: false, personalized: false, updatedAt: now });
+        await demoDb.insert('notification_prefs', {
+          userId: DEMO_GUEST_ID,
+          gift: true,
+          card: true,
+          expire: true,
+          report: true,
+          points: true,
+          promo: false,
+          quiet: true,
+        });
+      }
+      demoDb.setUser(DEMO_GUEST_ID);
+      await AsyncStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({ userId: DEMO_GUEST_ID, guest: true }));
     }
     setGuest(true);
     setStatus('signedIn');
