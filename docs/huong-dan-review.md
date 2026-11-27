@@ -2,6 +2,23 @@
 
 Mọi thứ chạy ở chế độ **DEMO** (dữ liệu mẫu trong bộ nhớ, không cần Supabase). Đồng hồ demo bắt đầu ở **22/11/2026 17:45** để các nhãn "Hôm nay", "2 giờ trước", HSD 30/11 khớp thiết kế.
 
+## 0. Review không cần cài gì (Expo, tài khoản gatlas.workspace)
+
+- **Dự án trên Expo**: https://expo.dev/accounts/gatlas.workspace/projects/frego
+- **App bản web** (Expo Hosting, mở trên điện thoại hoặc máy tính): https://frego--mz7ktmmhb9.expo.app — trên máy tính bật chế độ điện thoại (F12) cho đúng khung 390 px.
+- **App Android cài thử (APK)**: expo.dev → dự án frego → Builds → bản "preview" mới nhất → Install (quét mã QR bằng điện thoại Android, cho phép cài từ nguồn ngoài).
+- iPhone: dùng bản web ở trên; bản cài trên iPhone cần tài khoản Apple Developer (TestFlight) — chưa làm.
+
+Đẩy bản mới lên Expo (cần `EXPO_TOKEN` của tài khoản gatlas.workspace, tạo ở expo.dev → Access tokens):
+
+```bash
+cd apps/mobile && npx expo export --platform web && npx eas-cli@latest deploy
+```
+
+```bash
+cd apps/mobile && npx eas-cli@latest build --platform android --profile preview
+```
+
 ## 1. Chuẩn bị máy
 
 | Cần | Dùng cho | Cài |
