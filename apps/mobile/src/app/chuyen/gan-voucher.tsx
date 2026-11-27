@@ -65,7 +65,8 @@ export default function AttachScreen() {
         from={from}
         to={plan.dest.name}
         backLabel="Quay lại chọn điểm đến"
-        onBack={() => (router.canGoBack() ? router.back() : router.replace('/tim-kiem'))}
+        // Luôn về màn chọn điểm đến (kể cả khi vào thẳng So giá từ thẻ quán ở Trang chủ), tránh vòng lặp So giá ⇄ Gắn voucher.
+        onBack={() => router.dismissTo('/tim-kiem')}
         expanded={mapOpen}
         onExpandedChange={setMapOpen}
       />

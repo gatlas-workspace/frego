@@ -1,16 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DEST_RING_M, type VehicleClass } from '@frego/core';
 import { SponsorCounter, ZoomButtons } from '@/components/map/MapControls';
 import { MapSurface } from '@/components/map/MapSurface';
 import { SponsorCard } from '@/components/map/SponsorCard';
 import type { MapSurfaceHandle } from '@/components/map/types';
-import { BackButton, MapRoute } from '@/components/ui';
+import { BackButton, Icon, MapRoute, T } from '@/components/ui';
+import { pressScale } from '@/components/motion';
+import { usePickup } from '@/lib/pickup';
 import { useApi } from '@/lib/api';
 import { useTripFlow } from '@/lib/trip-flow';
-import { colors } from '@/theme/tokens';
+import { colors, HIT, shadow } from '@/theme/tokens';
 
 /** Chiều cao bản đồ phía trên tấm trượt (KetQua, ChonHang): 250 như khung 844; máy thấp thì thu lại để còn chỗ cho nội dung. */
 export const MAP_HEIGHT = 250;
@@ -76,13 +79,29 @@ export function MapHeader({
   // Đổi điểm đến thì bỏ chọn quán cũ.
   useEffect(() => setSelectedId(null), [plan?.dest.id]);
 
+  // Đổi điểm đón (bấm dòng điểm đón → màn Điểm đón → quay lại): tính lại chuyến với cùng điểm đến.
+  const { pickup } = usePickup();
+  const replanning = useRef(false);
+  useEffect(() => {
+    if (!plan || !pickup || replanning.current) return;
+    const moved = Math.abs(pickup.lat - plan.origin.lat) > 1e-6 || Math.abs(pickup.lng - plan.origin.lng) > 1e-6;
+    if (!moved) return;
+    replanning.current = true;
+    start(plan.dest.id)
+      .catch(() => {})
+      .finally(() => {
+        replanning.current = false;
+      });
+  }, [pickup, plan, start]);
+
   const pins = sponsors.data ?? [];
   const selected = pins.find((p) => p.businessId === selectedId) ?? null;
   const showCard = expanded && !!selected;
 
+  // Chạm ghim quán hoặc chạm vào bản đồ khi đang nhỏ → giãn bản đồ (tấm thông tin hạ xuống), khỏi phải bấm thanh kéo.
   const select = (id: string | null) => {
     setSelectedId(id);
-    if (id && !expanded) onExpandedChange?.(true);
+    if (!expanded) onExpandedChange?.(true);
   };
 
   const goTo = async () => {
@@ -129,8 +148,26 @@ export function MapHeader({
         accessibilityLabel={backLabel}
         style={{ position: 'absolute', top: Math.max(insets.top + 8, 52), left: 16 }}
       />
-      {plan ? (
-        <View style={{ position: 'absolute', top: Math.max(insets.top + 8, 52), right: 16 }}>
+      {/* Thẻ tuyến (UI v3): bấm dòng điểm đón để đổi điểm đón, dòng điểm đến để chọn nơi khác */}
+      <View
+        style={{
+          position: 'absolute',
+          top: Math.max(insets.top + 8, 52),
+          left: 16 + HIT + 10,
+          right: 16,
+          borderRadius: 14,
+          backgroundColor: colors.surface,
+          boxShadow: shadow.floatButton,
+          overflow: 'hidden',
+        }}
+      >
+        <RouteLine kind="from" label={from ?? plan?.origin.label ?? 'Điểm đón'} onPress={() => router.push('/diem-don')} />
+        <View style={{ height: 1, marginLeft: 34, backgroundColor: colors.line }} />
+        <RouteLine kind="to" label={to ?? plan?.dest.name ?? 'Điểm đến'} onPress={() => router.push('/tim-kiem')} />
+      </View>
+      {/* Nút phóng to/thu nhỏ chỉ khi bản đồ mở rộng (bản đồ nhỏ đã có thẻ tuyến chiếm chỗ). */}
+      {plan && expanded ? (
+        <View style={{ position: 'absolute', top: Math.max(insets.top + 8, 52) + 2 * HIT + 14, right: 16 }}>
           <ZoomButtons onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} />
         </View>
       ) : null}
@@ -157,5 +194,33 @@ export function MapHeader({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/** Một dòng trong thẻ tuyến: chấm (điểm đón) hoặc ô vuông (điểm đến), tên, bút sửa. */
+function RouteLine({ kind, label, onPress }: { kind: 'from' | 'to'; label: string; onPress: () => void }) {
+  const from = kind === 'from';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={from ? `Điểm đón: ${label}. Đổi điểm đón` : `Điểm đến: ${label}. Chọn điểm đến khác`}
+      style={({ pressed }) => [
+        { minHeight: HIT, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: pressed ? colors.surfaceAlt : colors.surface },
+        pressScale(pressed),
+      ]}
+    >
+      <View
+        style={
+          from
+            ? { width: 12, height: 12, borderRadius: 6, borderWidth: 3, borderColor: colors.primary, backgroundColor: colors.surface }
+            : { width: 10, height: 10, borderRadius: 2, marginHorizontal: 1, backgroundColor: colors.primary }
+        }
+      />
+      <T weight={from ? 600 : 800} size={13} lineHeight={18} numberOfLines={1} style={{ flex: 1, minWidth: 0 }}>
+        {label}
+      </T>
+      <Icon name="chev" size={14} color={colors.muted} strokeWidth={2.2} />
+    </Pressable>
   );
 }
