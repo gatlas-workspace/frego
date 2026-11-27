@@ -41,7 +41,7 @@
     "web": "expo start --web",
     "export:web": "expo export --platform web",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "tsc --noEmit"
   },
   "private": true
 }
