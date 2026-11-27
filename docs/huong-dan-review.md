@@ -5,7 +5,7 @@ Mọi thứ chạy ở chế độ **DEMO** (dữ liệu mẫu trong bộ nhớ,
 ## 0. Review không cần cài gì (Expo, tài khoản gatlas.workspace)
 
 - **Dự án trên Expo**: https://expo.dev/accounts/gatlas.workspace/projects/frego
-- **App bản web** (Expo Hosting, mở trên điện thoại hoặc máy tính): https://frego--3lrl6iki63.expo.app (bản 3.0 · UI v3, 27/11/2026; nhánh `ban-3-ui-v3`) — trên máy tính bật chế độ điện thoại (F12) cho đúng khung 390 px.
+- **App bản web** (Expo Hosting, mở trên điện thoại hoặc máy tính): https://frego.expo.app (địa chỉ chính thức, bản 3.0 · UI v3, 27/11/2026; nhánh `ban-3-ui-v3`) — trên máy tính bật chế độ điện thoại (F12) cho đúng khung 390 px.
 - **App Android cài thử (APK)**: expo.dev → dự án frego → Builds → bản "preview" mới nhất → Install (quét mã QR bằng điện thoại Android, cho phép cài từ nguồn ngoài).
 - **Expo Go (iPhone và Android)**: mở Expo Go (đăng nhập gatlas.workspace) → Projects → frego → nhánh **preview** → chọn bản mới nhất. Hoặc mở link `exp://u.expo.dev/6fc10379-54e7-47b4-a681-27e55ebacfac?channel-name=preview` trên điện thoại. Bản cập nhật 3.0: nhóm cập nhật `a6e00240-5fe7-483a-b595-1cd61f52ef53`. Dữ liệu demo cũ trên máy được nạp lại tự động (đổi khóa lưu sang v3).
 - Bản cài riêng trên iPhone (không qua Expo Go) cần tài khoản Apple Developer (TestFlight) — chưa làm.
