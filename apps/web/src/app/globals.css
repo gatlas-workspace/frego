@@ -253,4 +253,8 @@ body {
   color: var(--color-muted);
   opacity: 1;
 }
+/* Ô nhập web đã có vòng xanh ở khung bao (focus-within) nên bỏ viền focus chung để không bị hai vòng. */
+.web-field:focus-visible {
+  outline: none;
+}
 /* ==================== hết khối WEB QUẢN LÝ ==================== */

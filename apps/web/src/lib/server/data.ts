@@ -49,7 +49,9 @@ export async function getDb(): Promise<Db> {
     const role = (await cookies()).get(DEMO_ROLE_COOKIE)?.value as WebRole | undefined;
     const base = demoDb();
     const userId = role === 'admin' ? DEMO_ADMIN_ID : role === 'biz' ? DEMO_OWNER_ID : null;
-    return { ...base, currentUserId: () => userId } as Db;
+    // DEMO: một CSDL bộ nhớ cho cả tiến trình; gắn người dùng của request hiện tại (đủ cho bản demo).
+    base.setUser(userId);
+    return base;
   }
   const store = await cookies();
   const client = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
