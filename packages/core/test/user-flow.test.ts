@@ -315,7 +315,7 @@ describe('tìm đường theo đường phố (Valhalla)', () => {
       };
     }) as unknown as typeof fetch;
 
-  it('xe máy dùng chi phí motorcycle, ô tô dùng auto; trả km làm tròn và số phút', async () => {
+  it('xe máy dùng chi phí motor_scooter, ô tô dùng auto; trả km làm tròn và số phút', async () => {
     const calls: string[] = [];
     const router = createValhallaRouter({ baseUrl: 'https://valhalla.test/', fetch: fakeFetch(calls) });
     const r = await router.route(shape[0]!, shape[2]!, 'motorbike');
@@ -324,7 +324,8 @@ describe('tìm đường theo đường phố (Valhalla)', () => {
     expect(r?.coords).toEqual(shape);
     await router.route(shape[0]!, shape[2]!, 'car');
     expect(calls[0]!.startsWith('https://valhalla.test/route?json=')).toBe(true);
-    expect(decodeURIComponent(calls[0]!)).toContain('"costing":"motorcycle"');
+    expect(decodeURIComponent(calls[0]!)).toContain('"costing":"motor_scooter"');
+    expect(decodeURIComponent(calls[0]!)).not.toContain('ignore_access');
     expect(decodeURIComponent(calls[1]!)).toContain('"costing":"auto"');
   });
 
@@ -341,6 +342,30 @@ describe('tìm đường theo đường phố (Valhalla)', () => {
     expect(calls).toHaveLength(1);
     expect((await svc.routeLine(plan, 'car4')).source).toBe('road');
     expect(calls).toHaveLength(2);
+  });
+
+  it('không có đường (lỗi 442, VD điểm trong sân bay) → hỏi lại một lần, bỏ qua giới hạn ra vào', async () => {
+    const calls: string[] = [];
+    const f = (async (url: string) => {
+      calls.push(decodeURIComponent(String(url)));
+      if (calls.length === 1) return { ok: false, json: async () => ({ error_code: 442, error: 'No path could be found for input' }) };
+      return { ok: true, json: async () => ({ trip: { summary: { length: 10.3, time: 1920 }, legs: [{ shape: encode6(shape) }] } }) };
+    }) as unknown as typeof fetch;
+    const r = await createValhallaRouter({ baseUrl: 'https://valhalla.test', fetch: f }).route(shape[0]!, shape[2]!, 'motorbike');
+    expect(r?.km).toBe(10.3);
+    expect(r?.minutes).toBe(32);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain('"ignore_access":true');
+  });
+
+  it('lỗi khác 442 (VD 500) → không hỏi lại, dùng ước tính', async () => {
+    const calls: string[] = [];
+    const f = (async (url: string) => {
+      calls.push(String(url));
+      return { ok: false, json: async () => ({ error_code: 500 }) };
+    }) as unknown as typeof fetch;
+    expect(await createValhallaRouter({ baseUrl: 'https://valhalla.test', fetch: f }).route(shape[0]!, shape[2]!, 'car')).toBeNull();
+    expect(calls).toHaveLength(1);
   });
 
   it('máy chủ lỗi hoặc quá giờ → ước tính như cũ, đường nối thẳng', async () => {
