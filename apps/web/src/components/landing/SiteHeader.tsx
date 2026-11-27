@@ -30,7 +30,7 @@ export function NavAnchor({ href, className, children }: { href: string; classNa
 }
 
 
-/** Đầu trang: logo, menu mục, Cho doanh nghiệp, Tải app. Dưới 900px menu xuống hàng riêng. */
+/** Đầu trang: logo, menu mục, Cho doanh nghiệp, Đăng ký / Đăng nhập (mở app bản web). Dưới 900px menu xuống hàng riêng. */
 export function SiteHeader({ onLanding = true }: { onLanding?: boolean }) {
   return (
     <header id="dau-trang" className="bg-app-bg">
@@ -62,16 +62,19 @@ export function SiteHeader({ onLanding = true }: { onLanding?: boolean }) {
         <div className="ml-auto flex items-center gap-3">
           <NavAnchor
             href={sectionHref("doanh-nghiep", onLanding)}
-            className="flex min-h-11 items-center px-2.5 text-[15px] font-bold text-app-primary hover:text-app-primary-deep"
+            className="flex min-h-11 items-center whitespace-nowrap px-2.5 text-[15px] font-bold text-app-primary hover:text-app-primary-deep max-[640px]:hidden"
           >
             Cho doanh nghiệp
           </NavAnchor>
-          <NavAnchor
-            href={sectionHref("tai-app", onLanding)}
-            className="flex h-[46px] items-center rounded-[14px] bg-app-primary px-[22px] text-[15px] font-extrabold text-white transition-colors hover:bg-app-primary-deep"
+          {/* Dùng ngay trên trình duyệt: số điện thoại + mã OTP vừa là đăng ký vừa là đăng nhập. */}
+          <a
+            href={`${brand.web.appUrl}/dang-nhap`}
+            aria-label="Đăng ký hoặc đăng nhập để dùng Frego trên trình duyệt"
+            className="flex h-[46px] items-center whitespace-nowrap rounded-[14px] bg-app-primary px-[22px] text-[15px] font-extrabold text-white transition-colors hover:bg-app-primary-deep max-[640px]:h-11 max-[640px]:px-4 max-[640px]:text-sm"
           >
-            Tải app
-          </NavAnchor>
+            <span className="max-[640px]:hidden">Đăng ký / Đăng nhập</span>
+            <span className="hidden max-[640px]:inline">Đăng nhập</span>
+          </a>
         </div>
       </Wrap>
     </header>

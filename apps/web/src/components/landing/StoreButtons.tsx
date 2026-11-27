@@ -34,18 +34,22 @@ function PhoneGlyph() {
   );
 }
 
-export function StoreButton({ platform, variant }: { platform: "ios" | "android"; variant: Variant }) {
+export function StoreButton({ platform, variant, className = "" }: { platform: "ios" | "android"; variant: Variant; className?: string }) {
   const href = platform === "ios" ? brand.web.appStoreUrl : brand.web.playStoreUrl;
   const name = platform === "ios" ? "Tải cho iPhone" : "Tải cho Android";
+  const device = platform === "ios" ? "iPhone" : "Android";
   // Chưa có link App Store / Google Play thật (brand.web còn "#…"): hiện "Sắp có", không làm nút bấm không đi đâu.
   const ready = /^https?:\/\//.test(href);
-  const cls = `flex h-[60px] items-center gap-3 rounded-app-block pl-[18px] pr-[22px] transition-colors ${VARIANT[variant]}`;
+  const cls = `flex h-[60px] items-center gap-3 rounded-app-block pl-[18px] pr-[22px] transition-colors ${VARIANT[variant]} ${className}`;
   const inner = (
     <>
       <PhoneGlyph />
       <span className="flex flex-col leading-[1.2]">
         <span className="text-xs font-semibold opacity-80">{ready ? "Có trên" : "Sắp có"}</span>
-        <span className="text-[17px] font-extrabold">{name}</span>
+        <span className="text-[17px] font-extrabold max-[640px]:text-[15px]" aria-label={name}>
+          <span className="max-[640px]:hidden">Tải cho </span>
+          {device}
+        </span>
       </span>
     </>
   );

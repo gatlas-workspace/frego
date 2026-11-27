@@ -19,6 +19,8 @@ export const brand = {
   },
   web: {
     domain: 'frego.vn',
+    /** App bản web (Expo Hosting): đăng ký/đăng nhập và dùng ngay trên trình duyệt, cài được như app. */
+    appUrl: 'https://frego.expo.app',
     // Chưa có link chính thức (ghi chú landing: cần chốt).
     appStoreUrl: '#tai-app',
     playStoreUrl: '#tai-app',
