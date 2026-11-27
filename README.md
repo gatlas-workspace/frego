@@ -9,7 +9,7 @@ Gom mã Grab, Be, Green SM và quà nhãn hàng tặng riêng về một chỗ. 
 | Nghiệp vụ dùng chung (giá, gắn mã, điểm, định dạng VND) | `packages/core` | TypeScript, vitest |
 | Cơ sở dữ liệu, RLS, RPC | `supabase` | Postgres 16 (Supabase) |
 
-Spec: [docs/spec.md](docs/spec.md) · Quyết định: [docs/decisions](docs/decisions) · Tiến độ: [docs/progress.md](docs/progress.md) · Quy tắc cho AI agent: [CLAUDE.md](CLAUDE.md)
+Hướng dẫn review: [docs/huong-dan-review.md](docs/huong-dan-review.md) · Spec: [docs/spec.md](docs/spec.md) · Quyết định: [docs/decisions](docs/decisions) · Tiến độ: [docs/progress.md](docs/progress.md) · Quy tắc cho AI agent: [CLAUDE.md](CLAUDE.md)
 
 ## Chạy thử ngay (chế độ DEMO, không cần Supabase)
 
